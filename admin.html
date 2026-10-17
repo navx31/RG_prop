@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RG Properties — Admin</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  :root {
+    --gold:#d4a848; --gold-hover:#b8922f; --gold-glow:rgba(212,168,72,.25);
+    --bg:#0f0f0f; --card:#1a1a1a; --dark:#0c0c0c; --muted:#aaa;
+    --radius:14px; --t:.25s cubic-bezier(.4,0,.2,1);
+  }
+  html,body { height:100%; }
+  body {
+    font-family:'Inter',sans-serif; background:var(--bg); color:#fff;
+    line-height:1.55; overflow-x:hidden;
+  }
+  a { color:inherit; text-decoration:none; }
+  button { font-family:inherit; cursor:pointer; }
+  input,select,textarea { font-family:inherit; }
+
+  /* ---------- LOGIN ---------- */
+  .login-wrap {
+    position:fixed; inset:0; z-index:100;
+    display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(circle at 50% 40%, #1a1a1a, #0a0a0a 70%);
+    padding:20px;
+  }
+  .login-card {
+    width:100%; max-width:420px; background:var(--card);
+    border:1px solid rgba(212,168,72,.18); border-radius:var(--radius);
+    padding:40px 34px; box-shadow:0 30px 70px rgba(0,0,0,.8);
+  }
+  .login-card .brand {
+    display:flex; align-items:center; gap:10px;
+    font-size:1.5rem; font-weight:500; margin-bottom:6px;
+  }
+  .login-card .brand i { color:var(--gold); font-size:1.5rem; }
+  .login-card .brand span { color:var(--gold); }
+  .login-card p { color:var(--muted); font-size:.9rem; margin-bottom:26px; }
+  .login-card label {
+    display:block; font-size:.78rem; font-weight:600;
+    text-transform:uppercase; letter-spacing:.6px;
+    color:var(--muted); margin-bottom:8px;
+  }
+  .login-card input {
+    width:100%; padding:14px 16px; background:var(--dark);
+    border:1px solid #333; border-radius:10px; color:#fff;
+    font-size:1rem; outline:none; transition:var(--t); margin-bottom:20px;
+  }
+  .login-card input:focus {
+    border-color:var(--gold);
+    box-shadow:0 0 0 3px rgba(212,168,72,.15);
+  }
+
+  /* ---------- BUTTONS ---------- */
+  .btn {
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    padding:12px 22px; border:none; border-radius:50px;
+    font-weight:700; font-size:.9rem; letter-spacing:.3px;
+    background:var(--gold); color:var(--dark); transition:var(--t);
+  }
+  .btn:hover { background:var(--gold-hover); box-shadow:0 8px 22px var(--gold-glow); transform:translateY(-2px); }
+  .btn-block { width:100%; }
+  .btn-ghost {
+    background:transparent; border:1px solid #333; color:var(--muted);
+  }
+  .btn-ghost:hover { border-color:var(--gold); color:var(--gold); background:rgba(212,168,72,.06); box-shadow:none; transform:none; }
+  .btn-sm { padding:8px 16px; font-size:.8rem; }
+
+  /* ---------- HEADER ---------- */
+  header {
+    position:sticky; top:0; z-index:50;
+    background:rgba(12,12,12,.92); backdrop-filter:blur(12px);
+    border-bottom:1px solid rgba(212,168,72,.15);
+    padding:16px 0;
+  }
+  .container { max-width:1400px; margin:0 auto; padding:0 22px; }
+  .head-inner { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+  .head-brand { display:flex; align-items:center; gap:10px; font-size:1.35rem; font-weight:500; }
+  .head-brand i { color:var(--gold); }
+  .head-brand span { color:var(--gold); }
+  .head-brand .tag {
+    background:rgba(212,168,72,.12); color:var(--gold);
+    font-size:.65rem; font-weight:800; padding:3px 10px;
+    border-radius:50px; text-transform:uppercase; letter-spacing:.6px;
+    border:1px solid rgba(212,168,72,.25); margin-left:6px;
+  }
+  .head-actions { display:flex; align-items:center; gap:10px; }
+
+  /* ---------- STATS ---------- */
+  .stats-grid {
+    display:grid; gap:16px; margin:26px 0;
+    grid-template-columns:repeat(auto-fit, minmax(200px,1fr));
+  }
+  .stat-card {
+    background:var(--card); border:1px solid rgba(212,168,72,.08);
+    border-radius:var(--radius); padding:20px 22px; transition:var(--t);
+  }
+  .stat-card:hover { border-color:rgba(212,168,72,.25); transform:translateY(-3px); }
+  .stat-card .label {
+    font-size:.7rem; color:var(--muted); font-weight:700;
+    text-transform:uppercase; letter-spacing:.8px; margin-bottom:8px;
+    display:flex; align-items:center; gap:6px;
+  }
+  .stat-card .label i { color:var(--gold); }
+  .stat-card .value { font-size:1.9rem; font-weight:800; color:#fff; }
+  .stat-card.highlight .value { color:var(--gold); }
+
+  /* ---------- FILTERS ---------- */
+  .filters {
+    display:flex; flex-wrap:wrap; gap:12px; align-items:center;
+    background:var(--card); padding:16px 20px; border-radius:var(--radius);
+    border:1px solid rgba(212,168,72,.10); margin-bottom:22px;
+  }
+  .tabs { display:flex; gap:6px; flex-wrap:wrap; }
+  .tab {
+    padding:8px 18px; border-radius:50px; font-size:.85rem;
+    font-weight:600; background:transparent; border:1px solid #333;
+    color:var(--muted); transition:var(--t);
+  }
+  .tab:hover { border-color:var(--gold); color:var(--gold); }
+  .tab.active {
+    background:rgba(212,168,72,.14); border-color:var(--gold);
+    color:var(--gold);
+  }
+  .filters select, .filters input {
+    padding:9px 14px; background:var(--dark); border:1px solid #333;
+    border-radius:8px; color:#fff; font-size:.85rem; outline:none; transition:var(--t);
+  }
+  .filters select:focus, .filters input:focus { border-color:var(--gold); }
+  .filters .spacer { flex:1; }
+
+  /* ---------- TABLE ---------- */
+  .table-wrap {
+    background:var(--card); border-radius:var(--radius);
+    border:1px solid rgba(212,168,72,.08); overflow:hidden;
+  }
+  table { width:100%; border-collapse:collapse; font-size:.88rem; }
+  thead th {
+    text-align:left; padding:14px 16px; background:var(--dark);
+    font-size:.7rem; text-transform:uppercase; letter-spacing:.7px;
+    color:var(--muted); font-weight:700; border-bottom:1px solid rgba(212,168,72,.12);
+    white-space:nowrap;
+  }
+  tbody tr { border-bottom:1px solid rgba(255,255,255,.04); transition:var(--t); }
+  tbody tr:hover { background:rgba(212,168,72,.03); }
+  tbody td { padding:14px 16px; vertical-align:top; }
+
+  .name { font-weight:600; color:#fff; }
+  .sub  { font-size:.78rem; color:var(--muted); margin-top:2px; }
+
+  /* ---------- BADGES ---------- */
+  .badge {
+    display:inline-flex; align-items:center; gap:5px;
+    padding:4px 12px; border-radius:50px; font-size:.7rem;
+    font-weight:800; letter-spacing:.4px; text-transform:uppercase;
+    white-space:nowrap;
+  }
+  .badge.gold    { background:rgba(212,168,72,.15); color:var(--gold); border:1px solid rgba(212,168,72,.3); }
+  .badge.green   { background:rgba(46,125,50,.18);  color:#66bb6a; }
+  .badge.orange  { background:rgba(239,108,0,.18);  color:#ffa726; }
+  .badge.blue    { background:rgba(33,150,243,.18); color:#4fc3f7; }
+  .badge.purple  { background:rgba(156,39,176,.18); color:#ce93d8; }
+  .badge.muted   { background:rgba(255,255,255,.06); color:var(--muted); }
+  .badge.red     { background:rgba(198,40,40,.18);  color:#ef5350; }
+
+  /* ---------- ROW EXPAND ---------- */
+  .expand-btn {
+    background:transparent; border:1px solid #333; color:var(--muted);
+    width:30px; height:30px; border-radius:50%; display:inline-flex;
+    align-items:center; justify-content:center; transition:var(--t);
+  }
+  .expand-btn:hover { border-color:var(--gold); color:var(--gold); }
+  .expand-btn i { transition:var(--t); }
+  tr.expanded .expand-btn i { transform:rotate(180deg); }
+
+  .detail-row > td {
+    background:rgba(0,0,0,.35); padding:0 !important;
+    border-bottom:1px solid rgba(212,168,72,.12) !important;
+  }
+  .detail-box {
+    padding:22px 26px; display:grid; gap:22px;
+    grid-template-columns:1.2fr 1fr;
+  }
+  .detail-box h4 {
+    font-size:.72rem; text-transform:uppercase; letter-spacing:.8px;
+    color:var(--gold); margin-bottom:10px; font-weight:800;
+  }
+  .detail-grid {
+    display:grid; grid-template-columns:repeat(auto-fit, minmax(140px,1fr));
+    gap:12px;
+  }
+  .detail-item {
+    background:var(--dark); border:1px solid rgba(212,168,72,.08);
+    border-radius:10px; padding:10px 12px;
+  }
+  .detail-item strong {
+    display:block; font-size:.68rem; color:var(--muted);
+    text-transform:uppercase; letter-spacing:.5px; margin-bottom:3px; font-weight:700;
+  }
+  .detail-item span { font-size:.9rem; color:#fff; font-weight:500; }
+  .detail-message {
+    background:var(--dark); border-left:3px solid var(--gold);
+    border-radius:8px; padding:12px 16px; font-size:.88rem;
+    color:#ddd; margin-top:8px; white-space:pre-wrap;
+  }
+  .book-banner {
+    display:inline-flex; align-items:center; gap:8px;
+    background:linear-gradient(135deg, rgba(212,168,72,.2), rgba(212,168,72,.06));
+    border:1px solid rgba(212,168,72,.4); color:var(--gold);
+    font-size:.72rem; font-weight:800; padding:4px 12px;
+    border-radius:50px; text-transform:uppercase; letter-spacing:.5px;
+    margin-bottom:12px;
+  }
+
+  /* ---------- STATUS SELECT ---------- */
+  .status-select {
+    padding:6px 12px; border-radius:50px; font-size:.75rem;
+    font-weight:700; border:1px solid #333; background:var(--dark);
+    color:#fff; outline:none; cursor:pointer;
+  }
+  .status-select.new       { border-color:#4fc3f7; color:#4fc3f7; }
+  .status-select.contacted { border-color:var(--gold); color:var(--gold); }
+  .status-select.closed    { border-color:#66bb6a; color:#66bb6a; }
+
+  /* ---------- TOAST ---------- */
+  .toast {
+    position:fixed; bottom:26px; right:26px; z-index:999;
+    background:var(--card); border:1px solid var(--gold);
+    border-radius:12px; padding:14px 22px; font-weight:600;
+    display:flex; align-items:center; gap:12px; font-size:.9rem;
+    transform:translateY(120px); opacity:0; transition:var(--t);
+    box-shadow:0 20px 50px rgba(0,0,0,.6);
+  }
+  .toast.show { transform:translateY(0); opacity:1; }
+  .toast.error { border-color:#ef5350; }
+  .toast i { color:var(--gold); font-size:1.15rem; }
+  .toast.error i { color:#ef5350; }
+
+  /* ---------- EMPTY / LOADING ---------- */
+  .empty, .loading {
+    padding:70px 20px; text-align:center; color:var(--muted);
+  }
+  .empty i, .loading i { font-size:3rem; color:#333; margin-bottom:14px; display:block; }
+  .loading i { color:var(--gold); animation:spin 1s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* ---------- RESPONSIVE ---------- */
+  @media (max-width:900px) {
+    .detail-box { grid-template-columns:1fr; }
+    thead th:nth-child(3), tbody td:nth-child(3),
+    thead th:nth-child(5), tbody td:nth-child(5) { display:none; }
+  }
+  @media (max-width:640px) {
+    thead th:nth-child(6), tbody td:nth-child(6) { display:none; }
+    .head-actions .btn span { display:none; }
+    .filters { padding:14px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN SCREEN ============ -->
+<div class="login-wrap" id="loginWrap">
+  <div class="login-card">
+    <div class="brand">
+      <i class="fas fa-crown"></i> RG<span>Admin</span>
+    </div>
+    <p>Enter the admin password to continue.</p>
+    <label for="adminPwd">Password</label>
+    <input type="password" id="adminPwd" placeholder="••••••••" autocomplete="current-password" />
+    <button class="btn btn-block" id="loginBtn">
+      <i class="fas fa-lock"></i> Sign in
+    </button>
+  </div>
+</div>
+
+<!-- ============ DASHBOARD ============ -->
+<div id="app" style="display:none">
+  <header>
+    <div class="container head-inner">
+      <div class="head-brand">
+        <i class="fas fa-crown"></i> RG<span>Properties</span>
+        <span class="tag">Admin</span>
+      </div>
+      <div class="head-actions">
+        <button class="btn btn-ghost btn-sm" id="refreshBtn">
+          <i class="fas fa-rotate"></i> <span>Refresh</span>
+        </button>
+        <button class="btn btn-ghost btn-sm" id="logoutBtn">
+          <i class="fas fa-right-from-bracket"></i> <span>Logout</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Stats -->
+    <div class="stats-grid" id="statsGrid"></div>
+
+    <!-- Filters -->
+    <div class="filters">
+      <div class="tabs" id="sourceTabs">
+        <button class="tab active" data-source="all">All</button>
+        <button class="tab" data-source="book_now">
+          <i class="fas fa-calendar-check"></i> Book Now
+        </button>
+        <button class="tab" data-source="form">
+          <i class="fas fa-paper-plane"></i> Form
+        </button>
+      </div>
+
+      <select id="statusFilter">
+        <option value="">All Property Status</option>
+        <option value="new_property">New Property</option>
+        <option value="under_construction">Under Construction</option>
+        <option value="resale">Resale</option>
+        <option value="pre_released">Pre-Released Project</option>
+      </select>
+
+      <select id="workflowFilter">
+        <option value="">All Workflow</option>
+        <option value="new">New</option>
+        <option value="contacted">Contacted</option>
+        <option value="closed">Closed</option>
+      </select>
+
+      <div class="spacer"></div>
+
+      <input type="text" id="searchInput" placeholder="Search name, phone, property…" style="min-width:220px" />
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrap">
+      <div id="tableBody">
+        <div class="loading"><i class="fas fa-spinner"></i>Loading enquiries…</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ============ TOAST ============ -->
+<div class="toast" id="toast">
+  <i class="fas fa-check-circle"></i>
+  <span id="toastMsg">Done</span>
+</div>
+
+<script>
+/* ============================================================
+   CONFIG
+   ============================================================ */
+const API_BASE = '/api';
+const TOKEN_KEY = 'rg_admin_token';
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+const $  = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+
+function getToken() { return localStorage.getItem(TOKEN_KEY); }
+function setToken(t) { localStorage.setItem(TOKEN_KEY, t); }
+function clearToken() { localStorage.removeItem(TOKEN_KEY); }
+
+async function api(path, opts = {}) {
+  const headers = { 'Content-Type':'application/json', ...(opts.headers || {}) };
+  const token = getToken();
+  if (token) headers.Authorization = 'Bearer ' + token;
+
+  const res = await fetch(API_BASE + path, { ...opts, headers });
+  let data = {};
+  try { data = await res.json(); } catch {}
+
+  if (res.status === 401) {
+    clearToken();
+    showLogin();
+    throw new Error('Session expired');
+  }
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+
+function showToast(msg, isError = false) {
+  const t = $('#toast');
+  $('#toastMsg').textContent = msg;
+  t.classList.toggle('error', isError);
+  t.querySelector('i').className = isError
+    ? 'fas fa-exclamation-circle'
+    : 'fas fa-check-circle';
+  t.classList.add('show');
+  clearTimeout(t._tm);
+  t._tm = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function fmtPrice(p, category) {
+  if (p == null) return '—';
+  return category === 'rent'
+    ? `$${Number(p).toLocaleString()}/mo`
+    : `$${Number(p).toLocaleString()}`;
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  const dt = new Date(d);
+  return dt.toLocaleString('en-GB', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  });
+}
+
+function esc(str) {
+  return String(str ?? '').replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+/* ---------- Label / class maps ---------- */
+const STATUS_LABEL = {
+  new_property:       { label: 'New Property',        cls: 'green'  },
+  under_construction: { label: 'Under Construction',  cls: 'orange' },
+  resale:             { label: 'Resale',              cls: 'blue'   },
+  pre_released:       { label: 'Pre-Released',        cls: 'purple' }
+};
+
+const WORKFLOW_LABEL = {
+  new:       { label: 'New',       cls: 'new'       },
+  contacted: { label: 'Contacted', cls: 'contacted' },
+  closed:    { label: 'Closed',    cls: 'closed'    }
+};
+
+/* ============================================================
+   LOGIN
+   ============================================================ */
+function showLogin() {
+  $('#loginWrap').style.display = 'flex';
+  $('#app').style.display = 'none';
+}
+
+function showApp() {
+  $('#loginWrap').style.display = 'none';
+  $('#app').style.display = 'block';
+  loadAll();
+}
+
+$('#loginBtn').addEventListener('click', doLogin);
+$('#adminPwd').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+async function doLogin() {
+  const password = $('#adminPwd').value;
+  if (!password) return showToast('Enter the password', true);
+
+  try {
+    const res = await fetch(API_BASE + '/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Login failed');
+    setToken(data.token);
+    $('#adminPwd').value = '';
+    showApp();
+    showToast('Welcome back');
+  } catch (err) {
+    showToast(err.message, true);
+  }
+}
+
+$('#logoutBtn').addEventListener('click', () => {
+  clearToken();
+  showLogin();
+});
+
+/* ============================================================
+   STATE
+   ============================================================ */
+const state = {
+  source: 'all',
+  property_status: '',
+  status: '',
+  q: '',
+  list: [],
+  stats: null
+};
+
+/* ============================================================
+   LOAD STATS
+   ============================================================ */
+async function loadStats() {
+  try {
+    state.stats = await api('/enquiries/stats');
+    renderStats();
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function renderStats() {
+  const s = state.stats;
+  if (!s) return;
+  const cards = [
+    { label: 'Total Enquiries', value: s.total,   icon: 'fa-inbox',        highlight: false },
+    { label: 'Book Now',        value: s.bookNow, icon: 'fa-calendar-check',highlight: true  },
+    { label: 'Form Submits',    value: s.form,    icon: 'fa-paper-plane',  highlight: false },
+    { label: 'New Property',    value: s.byStatus.new_property,        icon: 'fa-certificate',     highlight: false },
+    { label: 'Under Constr.',   value: s.byStatus.under_construction,  icon: 'fa-helmet-safety',   highlight: false },
+    { label: 'Resale',          value: s.byStatus.resale,              icon: 'fa-rotate',          highlight: false },
+    { label: 'Pre-Released',    value: s.byStatus.pre_released,        icon: 'fa-bolt',            highlight: false },
+    { label: 'Workflow · New',  value: s.byWorkflow.new,               icon: 'fa-circle-dot',      highlight: false }
+  ];
+
+  $('#statsGrid').innerHTML = cards.map(c => `
+    <div class="stat-card ${c.highlight ? 'highlight' : ''}">
+      <div class="label"><i class="fas ${c.icon}"></i> ${c.label}</div>
+      <div class="value">${c.value}</div>
+    </div>
+  `).join('');
+}
+
+/* ============================================================
+   LOAD LIST
+   ============================================================ */
+async function loadList() {
+  const params = new URLSearchParams();
+  if (state.source)           params.set('source', state.source === 'all' ? '' : state.source);
+  if (state.property_status)  params.set('property_status', state.property_status);
+  if (state.status)           params.set('status', state.status);
+  if (state.q)                params.set('q', state.q);
+
+  // strip empty
+  [...params.keys()].forEach(k => { if (!params.get(k)) params.delete(k); });
+
+  try {
+    state.list = await api('/enquiries?' + params.toString());
+    renderTable();
+  } catch (err) {
+    showToast(err.message, true);
+  }
+}
+
+async function loadAll() {
+  await Promise.all([loadStats(), loadList()]);
+}
+
+/* ============================================================
+   RENDER TABLE
+   ============================================================ */
+function renderTable() {
+  const wrap = $('#tableBody');
+
+  if (!state.list.length) {
+    wrap.innerHTML = `<div class="empty">
+      <i class="fas fa-inbox"></i>
+      <h3>No enquiries found</h3>
+      <p>Try adjusting filters or wait for new submissions.</p>
+    </div>`;
+    return;
+  }
+
+  const rows = state.list.map(e => {
+    const ps = STATUS_LABEL[e.property_status] || { label: e.property_status, cls: 'muted' };
+    const wf = WORKFLOW_LABEL[e.status]         || { label: e.status,         cls: 'muted' };
+
+    const isBook = e.source === 'book_now';
+
+    return `
+      <tr data-id="${e._id}">
+        <td>
+          <div class="name">${esc(e.name)}</div>
+          <div class="sub">${esc(e.email)}</div>
+        </td>
+        <td>
+          <div>${esc(e.phone)}</div>
+          <div class="sub">${esc(e.interest)}</div>
+        </td>
+        <td>
+          <div>${esc(e.property_type)}</div>
+          <div class="sub">${esc(e.area)} ${esc(e.area_unit)}</div>
+        </td>
+        <td>${esc(e.location)}</td>
+        <td>
+          <span class="badge ${ps.cls}">${ps.label}</span>
+        </td>
+        <td>
+          ${isBook
+            ? `<span class="badge gold"><i class="fas fa-calendar-check"></i> Book Now</span>`
+            : `<span class="badge muted"><i class="fas fa-paper-plane"></i> Form</span>`}
+        </td>
+        <td>
+          <select class="status-select ${wf.cls}" data-action="workflow">
+            <option value="new"       ${e.status==='new'       ?'selected':''}>New</option>
+            <option value="contacted" ${e.status==='contacted' ?'selected':''}>Contacted</option>
+            <option value="closed"    ${e.status==='closed'    ?'selected':''}>Closed</option>
+          </select>
+        </td>
+        <td><div class="sub" style="white-space:nowrap">${fmtDate(e.createdAt)}</div></td>
+        <td style="text-align:right;white-space:nowrap">
+          <button class="expand-btn" data-action="expand" title="Details">
+            <i class="fas fa-chevron-down"></i>
+          </button>
+          <button class="expand-btn" data-action="delete" title="Delete"
+                  style="margin-left:6px">
+            <i class="fas fa-trash"></i>
+          </button>
+        </td>
+      </tr>
+      <tr class="detail-row" data-detail-for="${e._id}" style="display:none">
+        <td colspan="9">
+          ${renderDetail(e)}
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  wrap.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Contact</th>
+          <th>Phone / Interest</th>
+          <th>Type / Area</th>
+          <th>Location</th>
+          <th>Property Status</th>
+          <th>Source</th>
+          <th>Workflow</th>
+          <th>Date</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+
+  bindRowActions();
+}
+
+function renderDetail(e) {
+  const ps = STATUS_LABEL[e.property_status] || { label: e.property_status, cls: 'muted' };
+  const isBook = e.source === 'book_now';
+
+  const basicItems = `
+    <div class="detail-grid">
+      <div class="detail-item"><strong>Name</strong>      <span>${esc(e.name)}</span></div>
+      <div class="detail-item"><strong>Phone</strong>     <span>${esc(e.phone)}</span></div>
+      <div class="detail-item"><strong>Email</strong>     <span>${esc(e.email)}</span></div>
+      <div class="detail-item"><strong>Interest</strong>  <span>${esc(e.interest)}</span></div>
+      <div class="detail-item"><strong>Type</strong>      <span>${esc(e.property_type)}</span></div>
+      <div class="detail-item"><strong>Location</strong>  <span>${esc(e.location)}</span></div>
+      <div class="detail-item"><strong>Area</strong>      <span>${esc(e.area)} ${esc(e.area_unit)}</span></div>
+      <div class="detail-item"><strong>Made By</strong>   <span>${esc(e.made_by)}</span></div>
+      <div class="detail-item"><strong>Status</strong>    <span class="badge ${ps.cls}">${ps.label}</span></div>
+      <div class="detail-item"><strong>Source</strong>    <span>${isBook ? 'Book Now' : 'Form'}</span></div>
+      <div class="detail-item"><strong>Created</strong>   <span>${fmtDate(e.createdAt)}</span></div>
+      <div class="detail-item"><strong>Updated</strong>   <span>${fmtDate(e.updatedAt)}</span></div>
+    </div>
+    ${e.message ? `<h4 style="margin-top:16px">Message</h4>
+      <div class="detail-message">${esc(e.message)}</div>` : ''}
+  `;
+
+  if (!isBook) {
+    return `<div class="detail-box" style="grid-template-columns:1fr">
+      <div><h4>Enquiry Details</h4>${basicItems}</div>
+    </div>`;
+  }
+
+  return `
+    <div class="detail-box">
+      <div>
+        <span class="book-banner"><i class="fas fa-calendar-check"></i> Book Now — Selected Property</span>
+        <div class="detail-grid">
+          <div class="detail-item"><strong>Title</strong>    <span>${esc(e.property_title || '—')}</span></div>
+          <div class="detail-item"><strong>Location</strong> <span>${esc(e.property_location || '—')}</span></div>
+          <div class="detail-item"><strong>Price</strong>    <span>${fmtPrice(e.property_price, e.property_category)}</span></div>
+          <div class="detail-item"><strong>Category</strong> <span>${esc(e.property_category || '—')}</span></div>
+          <div class="detail-item"><strong>Type</strong>     <span>${esc(e.property_type_label || '—')}</span></div>
+          <div class="detail-item"><strong>Badge</strong>    <span>${esc(e.property_badge || '—')}</span></div>
+          <div class="detail-item"><strong>Property ID</strong><span>#${e.property_id ?? '—'}</span></div>
+        </div>
+      </div>
+      <div>
+        <h4>Customer Details</h4>
+        ${basicItems}
+      </div>
+    </div>
+  `;
+}
+
+/* ============================================================
+   ROW ACTIONS
+   ============================================================ */
+function bindRowActions() {
+  $$('[data-action="expand"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tr = btn.closest('tr');
+      const id = tr.dataset.id;
+      const detail = $(`[data-detail-for="${id}"]`);
+      const open = detail.style.display !== 'none';
+      detail.style.display = open ? 'none' : 'table-row';
+      tr.classList.toggle('expanded', !open);
+    });
+  });
+
+  $$('[data-action="delete"]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const tr = btn.closest('tr');
+      const id = tr.dataset.id;
+      if (!confirm('Delete this enquiry permanently?')) return;
+      try {
+        await api('/enquiries/' + id, { method: 'DELETE' });
+        showToast('Enquiry deleted');
+        loadAll();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    });
+  });
+
+  $$('[data-action="workflow"]').forEach(sel => {
+    sel.addEventListener('change', async () => {
+      const tr = sel.closest('tr');
+      const id = tr.dataset.id;
+      const status = sel.value;
+      try {
+        await api('/enquiries/' + id, {
+          method: 'PATCH',
+          body: JSON.stringify({ status })
+        });
+        sel.className = 'status-select ' + (WORKFLOW_LABEL[status]?.cls || 'new');
+        showToast('Status updated');
+        loadStats();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    });
+  });
+}
+
+/* ============================================================
+   FILTER EVENTS
+   ============================================================ */
+$$('#sourceTabs .tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    $$('#sourceTabs .tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    state.source = tab.dataset.source;
+    loadList();
+  });
+});
+
+$('#statusFilter').addEventListener('change', e => {
+  state.property_status = e.target.value;
+  loadList();
+});
+$('#workflowFilter').addEventListener('change', e => {
+  state.status = e.target.value;
+  loadList();
+});
+
+let searchTm;
+$('#searchInput').addEventListener('input', e => {
+  clearTimeout(searchTm);
+  searchTm = setTimeout(() => {
+    state.q = e.target.value.trim();
+    loadList();
+  }, 350);
+});
+
+$('#refreshBtn').addEventListener('click', () => {
+  loadAll();
+  showToast('Refreshed');
+});
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+(async function init() {
+  if (!getToken()) return showLogin();
+  // verify token by hitting stats
+  try {
+    await api('/enquiries/stats');
+    showApp();
+  } catch {
+    showLogin();
+  }
+})();
+</script>
+</body>
+</html>
