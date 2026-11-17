@@ -931,12 +931,250 @@
         }
         .trends-combined .legend-custom .dot.buy  { background: #d4a848; }
         .trends-combined .legend-custom .dot.rent { background: #4fc3f7; }
+         
+        /* ===== HAPPY CUSTOMERS / REVIEWS ===== */
+.reviews-section {
+    padding: 80px 0;
+    background: var(--bg-dark);
+    position: relative;
+    overflow: hidden;
+}
+.reviews-section::before {
+    content: '';
+    position: absolute;
+    top: -30%; left: -15%;
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(212, 168, 72, 0.05), transparent 70%);
+    border-radius: 50%;
+    pointer-events: none;
+}
+.reviews-section::after {
+    content: '';
+    position: absolute;
+    bottom: -25%; right: -10%;
+    width: 400px; height: 400px;
+    background: radial-gradient(circle, rgba(212, 168, 72, 0.04), transparent 70%);
+    border-radius: 50%;
+    pointer-events: none;
+}
+.reviews-wrapper { position: relative; z-index: 1; }
+.reviews-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 24px;
+    margin-bottom: 40px;
+}
+.review-card {
+    background: var(--card-bg);
+    border: 1px solid rgba(212, 168, 72, 0.10);
+    border-radius: var(--radius);
+    padding: 26px 26px 22px;
+    box-shadow: var(--shadow);
+    transition: var(--transition);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+.review-card:hover {
+    border-color: var(--gold);
+    box-shadow: var(--shadow-hover);
+    transform: translateY(-6px);
+}
+.review-card .quote-icon {
+    position: absolute;
+    top: 18px; right: 20px;
+    font-size: 1.5rem;
+    color: rgba(212, 168, 72, 0.18);
+    pointer-events: none;
+}
+.review-card .stars {
+    display: flex;
+    gap: 4px;
+    color: var(--gold);
+    margin-bottom: 14px;
+    font-size: 0.92rem;
+}
+.review-card .stars i.fa-star { color: var(--gold); }
+.review-card .stars i.fa-star.empty { color: #3a3a3a; }
+.review-card .review-text {
+    color: rgba(255, 255, 255, 0.88);
+    font-size: 0.95rem;
+    line-height: 1.7;
+    margin-bottom: 18px;
+    flex: 1;
+    word-break: break-word;
+}
+.review-card .review-author {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+.review-card .avatar {
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    background: var(--gold-gradient);
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 1rem;
+    flex-shrink: 0;
+    letter-spacing: 0.3px;
+}
+.review-card .author-info strong {
+    display: block;
+    font-size: 0.92rem;
+    color: var(--white);
+    font-weight: 700;
+}
+.review-card .author-info span {
+    font-size: 0.74rem;
+    color: var(--text-muted);
+}
+.reviews-cta {
+    text-align: center;
+    margin-top: 8px;
+}
+.reviews-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-muted);
+}
+.reviews-empty i { font-size: 3rem; color: #333; margin-bottom: 12px; }
+.reviews-empty h3 { color: var(--white); font-size: 1.2rem; margin-bottom: 4px; }
 
-        /* ===== CONTACT SECTION ===== */
-        .contact-section { padding: 80px 0; background: var(--bg-dark); position: relative; }
-        .contact-details-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+/* ===== REVIEW MODAL ===== */
+.review-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 2100;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+.review-modal.open { display: flex; }
+.review-modal .modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.88);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    animation: modalFade 0.25s ease;
+}
+.review-modal .review-modal-content {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 520px;
+    max-height: 92vh;
+    overflow-y: auto;
+    background: var(--card-bg);
+    border: 1px solid rgba(212, 168, 72, 0.2);
+    border-radius: var(--radius);
+    padding: 32px 34px 30px;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.85);
+    animation: modalIn 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.review-modal .modal-close {
+    position: absolute;
+    top: 14px; right: 14px;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    font-size: 0.95rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+}
+.review-modal .modal-close:hover {
+    background: var(--gold);
+    color: var(--primary);
+    transform: rotate(90deg);
+}
+.review-modal h3 {
+    font-size: 1.45rem;
+    font-weight: 800;
+    color: var(--white);
+    margin-bottom: 4px;
+}
+.review-modal .sub {
+    color: var(--text-muted);
+    font-size: 0.92rem;
+    margin-bottom: 20px;
+}
+.review-modal .form-group { margin-bottom: 18px; }
+.review-modal label {
+    display: block;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--white);
+    margin-bottom: 6px;
+}
+.review-modal label .required { color: #ef5350; margin-left: 2px; }
+.review-modal input[type="text"],
+.review-modal textarea {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid #333;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    background: var(--primary);
+    color: var(--white);
+    outline: none;
+    transition: var(--transition);
+}
+.review-modal input:focus,
+.review-modal textarea:focus {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px rgba(212, 168, 72, 0.10);
+}
+.review-modal textarea { resize: vertical; min-height: 100px; }
+.review-modal .hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+/* Interactive star rating */
+.star-input {
+    display: flex;
+    gap: 6px;
+    font-size: 1.6rem;
+    color: #3a3a3a;
+    cursor: pointer;
+    user-select: none;
+    margin-bottom: 4px;
+}
+.star-input i {
+    transition: color 0.15s ease, transform 0.15s ease;
+}
+.star-input i.active { color: var(--gold); text-shadow: 0 0 12px rgba(212, 168, 72, 0.35); }
+.star-input i:hover { transform: scale(1.12); }
+
+@media (max-width: 768px) {
+    .reviews-section { padding: 60px 0; }
+    .reviews-grid { grid-template-columns: 1fr; }
+    .review-modal { padding: 10px; }
+    .review-modal .review-modal-content { padding: 26px 22px 24px; }
+    .review-modal h3 { font-size: 1.25rem; }
+    .star-input { font-size: 1.4rem; }
+}
+
+/* ===== CONTACT SECTION ===== */
+.contact-section { padding: 80px 0; background: var(--bg-dark); position: relative; }
+.contact-details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
             gap: 24px;
             max-width: 1100px;
             margin: 0 auto;
@@ -1452,7 +1690,7 @@
         <div class="container header-inner">
             <a href="#" class="logo">
                 <i class="fas fa-crown"></i>
-                RG<span>RealEstates</span>
+                RG<span>Properties</span>
             </a>
 
             <nav class="nav-links" id="navLinks">
@@ -1775,7 +2013,26 @@
             </div>
         </div>
     </section>
+        <!-- ===== HAPPY CUSTOMERS / REVIEWS ===== -->
+    <section class="reviews-section" id="reviews">
+        <div class="container reviews-wrapper">
+            <div class="section-title" data-aos="fade-up">
+                <div class="badge-label"><i class="fas fa-star"></i> Testimonials</div>
+                <h2>Happy <span>Customers</span></h2>
+                <p id="reviewsSubtitle">Real stories from clients who found their dream properties with us.</p>
+            </div>
 
+            <div class="reviews-grid" id="reviewsGrid">
+                <!-- populated by JS -->
+            </div>
+
+            <div class="reviews-cta" data-aos="fade-up">
+                <button class="btn btn-gold btn-large glow-pulse" id="openReviewFormBtn">
+                    <i class="fas fa-pen"></i> Share Your Experience
+                </button>
+            </div>
+        </div>
+    </section>
     <!-- ===== CONTACT ===== -->
     <section class="contact-section" id="contact">
         <div class="container">
@@ -1798,14 +2055,21 @@
                     <i class="fas fa-envelope"></i>
                     <div>
                         <strong>Email</strong>
-                        <span id="contactEmail">hello@rgproperties.com</span>
+                        <span id="contactEmail">RGPROPERTIES513@gmail.com</span>
+                    </div>
+                </div>
+                <div class="contact-card" data-aos="fade-up" data-aos-delay="200">
+                    <i class="fas fa-globe"></i>
+                    <div>
+                        <strong>Website Contact</strong>
+                        <span id="contactEmail2">navjot17832@gmail.com</span>
                     </div>
                 </div>
                 <div class="contact-card" data-aos="fade-up" data-aos-delay="250">
                     <i class="fas fa-map-marker-alt"></i>
                     <div>
                         <strong>Address</strong>
-                        <span id="contactAddress">200 Park Avenue, New York</span>
+                        <span id="contactAddress">Shop no. 12, Didar Nagar, Kharar</span>
                     </div>
                 </div>
             </div>
@@ -1907,6 +2171,42 @@
     <button class="scroll-top" id="scrollTop" aria-label="Scroll to top">
         <i class="fas fa-chevron-up"></i>
     </button>
+        <!-- ===== REVIEW MODAL ===== -->
+    <div class="review-modal" id="reviewModal" aria-hidden="true">
+        <div class="modal-backdrop" data-close-review-modal></div>
+        <div class="review-modal-content" role="dialog" aria-modal="true" aria-label="Leave a review">
+            <button class="modal-close" id="reviewModalClose" aria-label="Close">
+                <i class="fas fa-times"></i>
+            </button>
+            <h3>Share Your Experience</h3>
+            <p class="sub">Your feedback helps us serve you better.</p>
+            <form id="reviewForm" novalidate>
+                <div class="form-group">
+                    <label for="reviewName">Your Name <span class="required">*</span></label>
+                    <input type="text" id="reviewName" placeholder="e.g. Navjot Singh" required />
+                </div>
+                <div class="form-group">
+                    <label>Your Rating <span class="required">*</span></label>
+                    <div class="star-input" id="starInput">
+                        <i class="fas fa-star" data-value="1"></i>
+                        <i class="fas fa-star" data-value="2"></i>
+                        <i class="fas fa-star" data-value="3"></i>
+                        <i class="fas fa-star" data-value="4"></i>
+                        <i class="fas fa-star" data-value="5"></i>
+                    </div>
+                    <input type="hidden" id="reviewRating" value="5" />
+                    <div class="hint">Tap a star to rate — 5 is best.</div>
+                </div>
+                <div class="form-group">
+                    <label for="reviewMessage">Your Review <span class="required">*</span></label>
+                    <textarea id="reviewMessage" placeholder="Tell us about your experience..." rows="4" maxlength="800" required></textarea>
+                </div>
+                <button type="submit" class="btn btn-gold btn-full">
+                    <i class="fas fa-paper-plane"></i> Submit Review
+                </button>
+            </form>
+        </div>
+    </div>
 
     <!-- ===== TOAST ===== -->
     <div class="toast" id="toast">
@@ -1924,8 +2224,9 @@
         brandName: 'RG Properties',
         phone1:    '+91 98140 70848',
         phone2:    '+91 99882 40354',
-        email:     'hello@rgproperties.com',
-        address:   '200 Park Avenue, New York',
+        email:     'RGPROPERTIES513@gmail.com',
+        email2:    'navjot17832@gmail.com',
+        address:   'Shop no. 12, Didar Nagar, Kharar',
         whatsapp:  '919814070848',   // digits only, no + or spaces
         logoUrl:   '',               // e.g. 'logo.png' — leave '' to keep the crown icon
         website:   location.origin
@@ -2676,8 +2977,8 @@
     function animateNumbers() {
         const targets = [
             { el: document.getElementById('statProperties'), target: properties.length, suffix: '+' },
-            { el: document.getElementById('statHappy'),      target: 1280, suffix: '+' },
-            { el: document.getElementById('statYears'),      target: 12,   suffix: '+' }
+            { el: document.getElementById('statHappy'),      target: 100,  suffix: '+' },
+            { el: document.getElementById('statYears'),      target: 2,    suffix: '+' }
         ];
 
         targets.forEach(({ el, target, suffix }) => {
@@ -2960,6 +3261,10 @@
         if (em && BUSINESS.email) {
             em.innerHTML = `<a href="mailto:${BUSINESS.email}" style="color:inherit;">${BUSINESS.email}</a>`;
         }
+        const em2 = document.getElementById('contactEmail2');
+        if (em2 && BUSINESS.email2) {
+            em2.innerHTML = `<a href="mailto:${BUSINESS.email2}" style="color:inherit;">${BUSINESS.email2}</a>`;
+        }
         if (ad && BUSINESS.address) {
             ad.textContent = BUSINESS.address;
         }
@@ -2986,9 +3291,256 @@
             fb.innerHTML = `&copy; 2026 ${BUSINESS.brandName}. All rights reserved. &nbsp;·&nbsp;
                 <a href="tel:${tel1}">${BUSINESS.phone1}</a>
                 ${tel2 ? ` &nbsp;·&nbsp; <a href="tel:${tel2}">${BUSINESS.phone2}</a>` : ''}
-                &nbsp;·&nbsp; <a href="mailto:${BUSINESS.email}">${BUSINESS.email}</a>`;
+                &nbsp;·&nbsp; <a href="mailto:${BUSINESS.email}">${BUSINESS.email}</a>
+                ${BUSINESS.email2 ? ` &nbsp;·&nbsp; <a href="mailto:${BUSINESS.email2}">${BUSINESS.email2}</a>` : ''}`;
         }
     })();
+        /* ============================================================
+       HAPPY CUSTOMERS / REVIEWS
+       ============================================================ */
+    const DEFAULT_REVIEWS = [
+        {
+            id: 1,
+            name: 'Harpreet Singh',
+            rating: 5,
+            message: 'RG Properties helped me find the perfect 3BHK in Mohali within my budget. The team was professional, transparent, and replied to every query on WhatsApp. Highly recommended!',
+            createdAt: '2025-08-12T10:00:00.000Z'
+        },
+        {
+            id: 2,
+            name: 'Simran Kaur',
+            rating: 5,
+            message: 'We bought our first independent villa through RG Properties. The entire process — from site visits to registry — was smooth and stress-free. Truly a 5-star experience.',
+            createdAt: '2025-09-03T10:00:00.000Z'
+        },
+        {
+            id: 3,
+            name: 'Amanjot Sandhu',
+            rating: 5,
+            message: 'Got a great plot in Kharar at a fair price. The staff patiently showed us multiple options and never pressured us. Honest service is rare — RG delivers it.',
+            createdAt: '2025-10-01T10:00:00.000Z'
+        },
+        {
+            id: 4,
+            name: 'Ritika Sharma',
+            rating: 4,
+            message: 'Found my rented apartment within a week. The Book Now feature made the whole process super easy. Would definitely use RG Properties again.',
+            createdAt: '2025-10-15T10:00:00.000Z'
+        }
+    ];
+
+    const reviewsGrid       = document.getElementById('reviewsGrid');
+    const reviewsSubtitle   = document.getElementById('reviewsSubtitle');
+    const openReviewFormBtn = document.getElementById('openReviewFormBtn');
+    const reviewModal       = document.getElementById('reviewModal');
+    const reviewModalClose  = document.getElementById('reviewModalClose');
+    const reviewForm        = document.getElementById('reviewForm');
+    const starInput         = document.getElementById('starInput');
+    const reviewRatingInput = document.getElementById('reviewRating');
+
+    let currentRating = 5;
+    let currentReviews = [];
+
+    /* Load reviews from backend, fall back to localStorage → defaults */
+    async function loadReviews() {
+        let reviews = [];
+        try {
+            const { ok, data } = await api('/reviews');
+            if (ok && Array.isArray(data)) reviews = data;
+        } catch (err) {
+            console.warn('Reviews backend unavailable — using local data.', err);
+        }
+
+        if (!reviews.length) {
+            reviews = JSON.parse(localStorage.getItem('rg_reviews') || '[]');
+        }
+        if (!reviews.length) {
+            reviews = DEFAULT_REVIEWS.slice();
+        }
+        currentReviews = reviews;
+        renderReviews(reviews);
+    }
+
+    function renderReviews(reviews) {
+        if (!reviews.length) {
+            reviewsGrid.innerHTML = `
+                <div class="reviews-empty">
+                    <i class="fas fa-comments"></i>
+                    <h3>No reviews yet</h3>
+                    <p>Be the first to share your experience.</p>
+                </div>`;
+            return;
+        }
+
+        reviewsGrid.innerHTML = reviews.map((r, idx) => {
+            const initial = (r.name || '?').trim().charAt(0).toUpperCase();
+            const stars = Array.from({ length: 5 }, (_, i) =>
+                `<i class="fas fa-star${i < (r.rating || 0) ? '' : ' empty'}"></i>`
+            ).join('');
+            const date = formatReviewDate(r.createdAt);
+
+            return `
+                <div class="review-card" data-aos="fade-up" data-aos-delay="${(idx % 3) * 100}">
+                    <i class="fas fa-quote-right quote-icon"></i>
+                    <div class="stars" aria-label="${r.rating} out of 5 stars">${stars}</div>
+                    <p class="review-text">"${escapeHtml(r.message)}"</p>
+                    <div class="review-author">
+                        <div class="avatar">${initial}</div>
+                        <div class="author-info">
+                            <strong>${escapeHtml(r.name)}</strong>
+                            <span>${date || 'Verified Customer'}</span>
+                        </div>
+                    </div>
+                </div>`;
+        }).join('');
+
+        if (reviewsSubtitle) {
+            reviewsSubtitle.textContent =
+                `${reviews.length} verified review${reviews.length !== 1 ? 's' : ''} from happy clients.`;
+        }
+        if (window.AOS) AOS.refresh();
+    }
+
+    function formatReviewDate(iso) {
+        if (!iso) return '';
+        try {
+            return new Date(iso).toLocaleDateString('en-IN', {
+                year: 'numeric', month: 'short', day: 'numeric'
+            });
+        } catch { return ''; }
+    }
+
+    function escapeHtml(s) {
+        return String(s || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    /* Star picker behaviour */
+    function setStarRating(value) {
+        currentRating = value;
+        if (reviewRatingInput) reviewRatingInput.value = value;
+        if (!starInput) return;
+        starInput.querySelectorAll('i').forEach((star, i) => {
+            star.classList.toggle('active', i < value);
+        });
+    }
+
+    if (starInput) {
+        starInput.querySelectorAll('i').forEach(star => {
+            star.addEventListener('click', () => {
+                setStarRating(parseInt(star.dataset.value, 10));
+            });
+            star.addEventListener('mouseenter', () => {
+                const v = parseInt(star.dataset.value, 10);
+                starInput.querySelectorAll('i').forEach((s, i) =>
+                    s.classList.toggle('active', i < v)
+                );
+            });
+        });
+        starInput.addEventListener('mouseleave', () => setStarRating(currentRating));
+        setStarRating(5);
+    }
+
+    /* Open / close review modal */
+    function openReviewModal() {
+        if (!reviewModal) return;
+        reviewForm.reset();
+        setStarRating(5);
+        reviewModal.classList.add('open');
+        reviewModal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('modal-open');
+    }
+    function closeReviewModal() {
+        if (!reviewModal) return;
+        reviewModal.classList.remove('open');
+        reviewModal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('modal-open');
+    }
+
+    openReviewFormBtn?.addEventListener('click', openReviewModal);
+    reviewModalClose?.addEventListener('click', closeReviewModal);
+    reviewModal?.querySelector('[data-close-review-modal]')?.addEventListener('click', closeReviewModal);
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && reviewModal?.classList.contains('open')) closeReviewModal();
+    });
+
+    /* Submit review */
+    reviewForm?.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const name    = document.getElementById('reviewName').value.trim();
+        const message = document.getElementById('reviewMessage').value.trim();
+        const rating  = parseInt(reviewRatingInput.value, 10) || 0;
+
+        if (!name)             return showToast('Please enter your name.', true);
+        if (!message)          return showToast('Please write your review.', true);
+        if (message.length < 8) return showToast('Review is too short.', true);
+        if (rating < 1 || rating > 5) return showToast('Please pick a rating (1–5).', true);
+
+        const payload = { name, rating, message };
+
+        const submitBtn = reviewForm.querySelector('button[type="submit"]');
+        const original  = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting…';
+
+        let savedReview = null;
+        let failed = false;
+
+        try {
+            const { ok, status, data } = await api('/reviews', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+
+            if (ok && data) {
+                savedReview = data;
+            } else if (status === 404 || status === 405 || status === 0) {
+                savedReview = { ...payload, id: Date.now(), createdAt: new Date().toISOString() };
+                saveReviewLocally(savedReview);
+            } else {
+                throw new Error((data && data.error) || 'Could not submit review.');
+            }
+        } catch (err) {
+            if (err instanceof TypeError) {
+                savedReview = { ...payload, id: Date.now(), createdAt: new Date().toISOString() };
+                saveReviewLocally(savedReview);
+            } else {
+                console.error('Review submit error:', err);
+                showToast(err.message || 'Could not submit review.', true);
+                failed = true;
+            }
+        }
+
+        submitBtn.disabled  = false;
+        submitBtn.innerHTML = original;
+        if (failed) return;
+
+        // Prepend and re-render
+        currentReviews = [savedReview, ...currentReviews];
+        renderReviews(currentReviews);
+
+        closeReviewModal();
+        showToast(`Thanks ${name}! Your review has been posted.`);
+        document.getElementById('reviews').scrollIntoView({ behavior: 'smooth' });
+    });
+
+    function saveReviewLocally(review) {
+        try {
+            const list = JSON.parse(localStorage.getItem('rg_reviews') || '[]');
+            list.unshift(review);
+            localStorage.setItem('rg_reviews', JSON.stringify(list.slice(0, 200)));
+        } catch (e) {
+            console.warn('Could not save review locally', e);
+        }
+    }
+
+    /* Kick off */
+    loadReviews();
 
     /* ============================================================
        INIT

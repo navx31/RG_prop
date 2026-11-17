@@ -1,315 +1,454 @@
-/* ============================================================
-   RG PROPERTIES — BACKEND
-   - Serves index.html + admin.html
-   - POST /api/enquiries          → public (form + Book Now)
-   - POST /api/admin/login        → admin login
-   - GET  /api/enquiries          → admin: list with filters
-   - PATCH /api/enquiries/:id     → admin: update workflow status
-   - DELETE /api/enquiries/:id    → admin: delete
-   ============================================================ */
-
 require('dotenv').config();
-const path     = require('path');
-const express  = require('express');
-const cors     = require('cors');
-const mongoose = require('mongoose');
-const jwt      = require('jsonwebtoken');
+const express = require('express');
+const cors = require('cors');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const { createClient } = require('@libsql/client');
+const path = require('path');
+const fs = require('fs');
 
-const app  = express();
-const PORT = process.env.PORT || 5000;
+const app = express();
+const PORT = process.env.PORT || 4000;
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
+const JWT_EXPIRES = '7d';
 
-/* ---------- Middleware ---------- */
-app.use(cors());
-app.use(express.json({ limit: '1mb' }));
-app.use(express.static(path.join(__dirname)));   // serves index.html + admin.html
+/* ─────────────── DATABASE (Turso / libSQL) ─────────────── */
+if (!process.env.TURSO_DATABASE_URL || !process.env.TURSO_AUTH_TOKEN) {
+  console.error('❌ Missing TURSO_DATABASE_URL or TURSO_AUTH_TOKEN in .env');
+  process.exit(1);
+}
 
-/* ---------- MongoDB ---------- */
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('✅ MongoDB connected'))
-  .catch(err => {
-    console.error('❌ MongoDB error:', err.message);
-    process.exit(1);
+const db = createClient({
+  url: process.env.TURSO_DATABASE_URL,
+  authToken: process.env.TURSO_AUTH_TOKEN,
+});
+
+console.log('🌐 Connected to Turso database:', process.env.TURSO_DATABASE_URL.split('?')[0]);
+
+/* ─────────────── REVIEWS FILE HELPERS ─────────────── */
+const REVIEWS_FILE = path.join(__dirname, 'reviews.json');
+
+function readJson(file, fallback) {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
+  catch { return fallback; }
+}
+function writeJson(file, data) {
+  fs.writeFileSync(file, JSON.stringify(data, null, 2));
+}
+
+/* ─────────────── SCHEMA + ADMIN SEED ─────────────── */
+async function initDb() {
+  await db.execute(`CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    phone TEXT,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'user',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`);
+
+  await db.execute(`CREATE TABLE IF NOT EXISTS enquiries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    email TEXT NOT NULL,
+    interest TEXT NOT NULL,
+    property_type TEXT NOT NULL,
+    location TEXT NOT NULL,
+    area INTEGER NOT NULL,
+    area_unit TEXT NOT NULL DEFAULT 'sqft',
+    made_by TEXT NOT NULL,
+    property_status TEXT NOT NULL,
+    message TEXT,
+    workflow_status TEXT NOT NULL DEFAULT 'new',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+  )`);
+
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_enq_created ON enquiries(created_at DESC)`);
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_enq_status  ON enquiries(workflow_status)`);
+
+  const ADMIN_EMAIL    = (process.env.ADMIN_EMAIL    || 'admin@rgproperties.com').toLowerCase();
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD  || 'Admin@12345';
+  const ADMIN_NAME     = process.env.ADMIN_NAME      || 'Owner';
+
+  const found = await db.execute({
+    sql: 'SELECT id FROM users WHERE email = ?',
+    args: [ADMIN_EMAIL]
   });
 
-/* ---------- Schema ---------- */
-const enquirySchema = new mongoose.Schema({
-  // contact
-  name:  { type: String, required: true, trim: true },
-  phone: { type: String, required: true, trim: true },
-  email: { type: String, required: true, trim: true, lowercase: true },
-
-  // interest
-  interest: {
-    type: String,
-    enum: ['buy', 'sell', 'rent'],
-    required: true
-  },
-  property_type: {
-    type: String,
-    enum: ['plots', 'villa', 'apartment', 'house', 'commercial'],
-    required: true
-  },
-  location:  { type: String, required: true, trim: true },
-  area:      { type: Number, required: true, min: 1 },
-  area_unit: { type: String, enum: ['sqft', 'Gajj'], default: 'sqft' },
-  made_by:   { type: String, enum: ['builder', 'owner', 'both'], required: true },
-
-  // NEW — property lifecycle status
-  property_status: {
-    type: String,
-    enum: ['new_property', 'under_construction', 'resale', 'pre_released'],
-    required: true
-  },
-
-  message: { type: String, default: '' },
-
-  // NEW — where the enquiry came from
-  source: {
-    type: String,
-    enum: ['form', 'book_now'],
-    default: 'form',
-    index: true
-  },
-
-  // NEW — property snapshot when source === 'book_now'
-  property_id:         { type: Number,  default: null },
-  property_title:      { type: String,  default: '' },
-  property_location:   { type: String,  default: '' },
-  property_price:      { type: Number,  default: null },
-  property_category:   { type: String,  default: '' },
-  property_type_label: { type: String,  default: '' },
-  property_badge:      { type: String,  default: '' },
-
-  // admin workflow
-  status: {
-    type: String,
-    enum: ['new', 'contacted', 'closed'],
-    default: 'new',
-    index: true
+  if (found.rows.length === 0) {
+    const hash = bcrypt.hashSync(ADMIN_PASSWORD, 10);
+    await db.execute({
+      sql: 'INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)',
+      args: [ADMIN_NAME, ADMIN_EMAIL, hash, 'admin']
+    });
+    console.log(`✔ Admin created → ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`);
+  } else {
+    console.log(`✔ Admin already exists → ${ADMIN_EMAIL}`);
   }
-}, { timestamps: true });
-
-const Enquiry = mongoose.model('Enquiry', enquirySchema);
-
-/* ---------- Allowed values ---------- */
-const ALLOWED_INTERESTS = ['buy', 'sell', 'rent'];
-const ALLOWED_TYPES     = ['plots', 'villa', 'apartment', 'house', 'commercial'];
-const ALLOWED_MADE_BY   = ['builder', 'owner', 'both'];
-const ALLOWED_STATUSES  = ['new_property', 'under_construction', 'resale', 'pre_released'];
-const ALLOWED_SOURCES   = ['form', 'book_now'];
-const ALLOWED_WORKFLOW  = ['new', 'contacted', 'closed'];
-
-/* ---------- Admin auth ---------- */
-function signToken() {
-  return jwt.sign({ role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '7d' });
 }
 
-function requireAdmin(req, res, next) {
-  const header = req.headers.authorization || '';
-  const token  = header.startsWith('Bearer ') ? header.slice(7) : null;
-  if (!token) return res.status(401).json({ error: 'Missing token' });
+/* ─────────────── MIDDLEWARE ─────────────── */
+app.use(cors());
+app.use(express.json({ limit: '1mb' }));
+app.use(express.static(path.join(__dirname, 'public')));
+
+function auth(req, res, next) {
+  const h = req.headers.authorization || '';
+  const token = h.startsWith('Bearer ') ? h.slice(7) : null;
+  if (!token) return res.status(401).json({ error: 'Authentication required.' });
+  try { req.user = jwt.verify(token, JWT_SECRET); next(); }
+  catch { res.status(401).json({ error: 'Invalid or expired token.' }); }
+}
+
+function adminOnly(req, res, next) {
+  if (!req.user || req.user.role !== 'admin')
+    return res.status(403).json({ error: 'Admin access required.' });
+  next();
+}
+
+function optionalAuth(req, res, next) {
+  const h = req.headers.authorization || '';
+  const token = h.startsWith('Bearer ') ? h.slice(7) : null;
+  if (token) { try { req.user = jwt.verify(token, JWT_SECRET); } catch {} }
+  next();
+}
+
+const sign = (u) => jwt.sign(
+  { id: u.id, name: u.name, email: u.email, role: u.role },
+  JWT_SECRET, { expiresIn: JWT_EXPIRES }
+);
+
+/* ─────────────── AUTH ROUTES ─────────────── */
+
+app.post('/api/auth/register', async (req, res) => {
   try {
-    req.admin = jwt.verify(token, process.env.JWT_SECRET);
-    next();
-  } catch {
-    res.status(401).json({ error: 'Invalid or expired token' });
-  }
-}
+    const { name, email, phone, password } = req.body || {};
+    if (!name || !email || !password)
+      return res.status(400).json({ error: 'Name, email and password are required.' });
+    if (String(password).length < 6)
+      return res.status(400).json({ error: 'Password must be at least 6 characters.' });
 
-/* ============================================================
-   PUBLIC — create enquiry (form or Book Now)
-   ============================================================ */
-app.post('/api/enquiries', async (req, res) => {
+    const cleanEmail = String(email).toLowerCase().trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail))
+      return res.status(400).json({ error: 'Invalid email address.' });
+
+    const existing = await db.execute({
+      sql: 'SELECT id FROM users WHERE email = ?',
+      args: [cleanEmail]
+    });
+    if (existing.rows.length > 0)
+      return res.status(409).json({ error: 'Email already registered. Please log in.' });
+
+    const hash = bcrypt.hashSync(password, 10);
+    const result = await db.execute({
+      sql: 'INSERT INTO users (name, email, phone, password_hash, role) VALUES (?, ?, ?, ?, ?)',
+      args: [String(name).trim(), cleanEmail, phone || null, hash, 'user']
+    });
+
+    const user = {
+      id: Number(result.lastInsertRowid),
+      name: String(name).trim(),
+      email: cleanEmail,
+      role: 'user'
+    };
+    res.status(201).json({ token: sign(user), user });
+  } catch (err) {
+    console.error('Register error:', err);
+    res.status(500).json({ error: 'Server error during registration.' });
+  }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+    if (!email || !password)
+      return res.status(400).json({ error: 'Email and password are required.' });
+
+    const found = await db.execute({
+      sql: 'SELECT * FROM users WHERE email = ?',
+      args: [String(email).toLowerCase().trim()]
+    });
+    const row = found.rows[0];
+
+    if (!row || !bcrypt.compareSync(password, row.password_hash))
+      return res.status(401).json({ error: 'Invalid email or password.' });
+
+    const user = { id: row.id, name: row.name, email: row.email, role: row.role };
+    res.json({ token: sign(user), user });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Server error during login.' });
+  }
+});
+
+app.get('/api/auth/me', auth, async (req, res) => {
+  try {
+    const found = await db.execute({
+      sql: 'SELECT id, name, email, phone, role, created_at FROM users WHERE id = ?',
+      args: [req.user.id]
+    });
+    if (!found.rows[0]) return res.status(404).json({ error: 'User not found.' });
+    res.json({ user: found.rows[0] });
+  } catch {
+    res.status(500).json({ error: 'Server error.' });
+  }
+});
+
+/* ─────────────── ENQUIRY ROUTES ─────────────── */
+
+app.post('/api/enquiries', optionalAuth, async (req, res) => {
   try {
     const b = req.body || {};
-
-    // Required-field validation
-    if (!b.name)  return res.status(400).json({ error: 'Name is required' });
-    if (!b.phone) return res.status(400).json({ error: 'Phone is required' });
-    if (!b.email || !b.email.includes('@'))
-      return res.status(400).json({ error: 'Valid email is required' });
-
-    if (!ALLOWED_INTERESTS.includes(b.interest))
-      return res.status(400).json({ error: 'Invalid interest' });
-
-    if (!ALLOWED_TYPES.includes(b.property_type))
-      return res.status(400).json({ error: 'Invalid property_type' });
-
-    if (!b.location)
-      return res.status(400).json({ error: 'Location is required' });
-
-    if (!b.area || Number(b.area) <= 0)
-      return res.status(400).json({ error: 'Valid area is required' });
-
-    if (!ALLOWED_MADE_BY.includes(b.made_by))
-      return res.status(400).json({ error: 'Invalid made_by' });
-
-    if (!ALLOWED_STATUSES.includes(b.property_status)) {
-      return res.status(400).json({
-        error: `Invalid property_status. Allowed: ${ALLOWED_STATUSES.join(', ')}`
-      });
+    const required = ['name', 'phone', 'email', 'interest', 'property_type',
+                      'location', 'area', 'made_by', 'property_status'];
+    for (const k of required) {
+      if (b[k] === undefined || b[k] === null || b[k] === '')
+        return res.status(400).json({ error: `Missing field: ${k}` });
     }
+    if (!['buy', 'sell', 'rent'].includes(b.interest))
+      return res.status(400).json({ error: 'Interest must be buy, sell, or rent.' });
+    if (isNaN(Number(b.area)) || Number(b.area) <= 0)
+      return res.status(400).json({ error: 'Area must be a positive number.' });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(b.email)))
+      return res.status(400).json({ error: 'Invalid email address.' });
 
-    const source = b.source || 'form';
-    if (!ALLOWED_SOURCES.includes(source))
-      return res.status(400).json({ error: 'Invalid source' });
-
-    // Build payload
-    const payload = {
-      name: b.name, phone: b.phone, email: b.email,
-      interest: b.interest,
-      property_type: b.property_type,
-      location: b.location,
-      area: Number(b.area),
-      area_unit: b.area_unit || 'sqft',
-      made_by: b.made_by,
-      property_status: b.property_status,
-      message: b.message || '',
-      source
-    };
-
-    // Attach property snapshot when Book Now
-    if (source === 'book_now') {
-      payload.property_id         = b.property_id ?? null;
-      payload.property_title      = b.property_title || '';
-      payload.property_location   = b.property_location || '';
-      payload.property_price      = b.property_price != null ? Number(b.property_price) : null;
-      payload.property_category   = b.property_category || '';
-      payload.property_type_label = b.property_type_label || '';
-      payload.property_badge      = b.property_badge || '';
-    }
-
-    const saved = await Enquiry.create(payload);
-    console.log(`📥 [${source}] ${saved.name} → ${saved.property_status}`);
+    const result = await db.execute({
+      sql: `INSERT INTO enquiries
+        (user_id, name, phone, email, interest, property_type, location,
+         area, area_unit, made_by, property_status, message)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        req.user?.id || null,
+        String(b.name).trim(),
+        String(b.phone).trim(),
+        String(b.email).trim().toLowerCase(),
+        b.interest,
+        String(b.property_type).trim(),
+        String(b.location).trim(),
+        Number(b.area),
+        b.area_unit === 'gaj' ? 'gaj' : 'sqft',
+        b.made_by,
+        b.property_status,
+        b.message ? String(b.message).trim() : null
+      ]
+    });
 
     res.status(201).json({
-      ok: true,
-      message: 'Enquiry received',
-      enquiry: {
-        id: saved._id,
-        source: saved.source,
-        property_status: saved.property_status,
-        property_title: saved.property_title,
-        createdAt: saved.createdAt
+      id: Number(result.lastInsertRowid),
+      message: 'Enquiry submitted successfully.'
+    });
+  } catch (err) {
+    console.error('Enquiry error:', err);
+    res.status(500).json({ error: 'Server error while saving enquiry.' });
+  }
+});
+
+app.get('/api/enquiries', auth, adminOnly, async (req, res) => {
+  try {
+    const page   = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit  = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
+    const offset = (page - 1) * limit;
+
+    const q        = String(req.query.q || '').trim();
+    const status   = req.query.status   || 'all';
+    const interest = req.query.interest || 'all';
+    const sort     = req.query.sort     || 'newest';
+
+    const where = [];
+    const args = [];
+
+    if (q) {
+      where.push('(name LIKE ? OR email LIKE ? OR phone LIKE ? OR location LIKE ? OR property_type LIKE ?)');
+      const like = `%${q}%`;
+      args.push(like, like, like, like, like);
+    }
+    if (['new', 'contacted', 'closed'].includes(status)) { where.push('workflow_status = ?'); args.push(status); }
+    if (['buy', 'sell', 'rent'].includes(interest))       { where.push('interest = ?');       args.push(interest); }
+
+    const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
+    const orderSql = sort === 'oldest' ? 'ORDER BY created_at ASC'
+                   : sort === 'name'   ? 'ORDER BY name ASC'
+                   : 'ORDER BY created_at DESC';
+
+    const countRes = await db.execute({
+      sql: `SELECT COUNT(*) AS c FROM enquiries ${whereSql}`,
+      args
+    });
+    const total = Number(countRes.rows[0].c);
+
+    const listRes = await db.execute({
+      sql: `SELECT * FROM enquiries ${whereSql} ${orderSql} LIMIT ? OFFSET ?`,
+      args: [...args, limit, offset]
+    });
+
+    res.json({
+      enquiries: listRes.rows,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 }
+    });
+  } catch (err) {
+    console.error('List error:', err);
+    res.status(500).json({ error: 'Server error while loading enquiries.' });
+  }
+});
+
+app.get('/api/enquiries/stats', auth, adminOnly, async (_req, res) => {
+  try {
+    const totalRes = await db.execute('SELECT COUNT(*) AS c FROM enquiries');
+    const total = Number(totalRes.rows[0].c);
+
+    const groupRes = await db.execute(
+      'SELECT workflow_status, COUNT(*) AS c FROM enquiries GROUP BY workflow_status'
+    );
+    const byWorkflow = {};
+    groupRes.rows.forEach(r => { byWorkflow[r.workflow_status] = Number(r.c); });
+
+    const todayRes = await db.execute(
+      "SELECT COUNT(*) AS c FROM enquiries WHERE date(created_at) = date('now')"
+    );
+    const last7Res = await db.execute(
+      "SELECT COUNT(*) AS c FROM enquiries WHERE created_at >= datetime('now','-7 days')"
+    );
+
+    res.json({
+      stats: {
+        total,
+        byWorkflow,
+        today: Number(todayRes.rows[0].c),
+        last7Days: Number(last7Res.rows[0].c)
       }
     });
   } catch (err) {
-    console.error('❌ Enquiry error:', err);
-    res.status(500).json({ error: err.message || 'Something went wrong' });
+    console.error('Stats error:', err);
+    res.status(500).json({ error: 'Server error while loading stats.' });
   }
 });
 
-/* ============================================================
-   ADMIN — login
-   ============================================================ */
-app.post('/api/admin/login', (req, res) => {
-  const { password } = req.body || {};
-  if (!password) return res.status(400).json({ error: 'Password required' });
-  if (password !== process.env.ADMIN_PASSWORD)
-    return res.status(401).json({ error: 'Incorrect password' });
-  res.json({ ok: true, token: signToken() });
-});
-
-/* ============================================================
-   ADMIN — list enquiries (filters: source, property_status, status, q)
-   ============================================================ */
-app.get('/api/enquiries', requireAdmin, async (req, res) => {
+app.patch('/api/enquiries/:id', auth, adminOnly, async (req, res) => {
   try {
-    const { source, property_status, status, q } = req.query;
-    const filter = {};
-    if (source)          filter.source = source;
-    if (property_status) filter.property_status = property_status;
-    if (status)          filter.status = status;
-    if (q) {
-      filter.$or = [
-        { name:             { $regex: q, $options: 'i' } },
-        { email:            { $regex: q, $options: 'i' } },
-        { phone:            { $regex: q, $options: 'i' } },
-        { location:         { $regex: q, $options: 'i' } },
-        { property_title:   { $regex: q, $options: 'i' } }
-      ];
-    }
+    const id = Number(req.params.id);
+    const { workflow_status } = req.body || {};
+    if (!['new', 'contacted', 'closed'].includes(workflow_status))
+      return res.status(400).json({ error: 'Invalid workflow_status.' });
 
-    const list = await Enquiry.find(filter).sort({ createdAt: -1 }).lean();
-    res.json(list);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    const result = await db.execute({
+      sql: 'UPDATE enquiries SET workflow_status = ? WHERE id = ?',
+      args: [workflow_status, id]
+    });
+
+    if (Number(result.rowsAffected) === 0)
+      return res.status(404).json({ error: 'Enquiry not found.' });
+    res.json({ message: 'Updated.' });
+  } catch {
+    res.status(500).json({ error: 'Server error.' });
   }
 });
 
-/* ============================================================
-   ADMIN — dashboard summary
-   ============================================================ */
-app.get('/api/enquiries/stats', requireAdmin, async (_req, res) => {
+app.delete('/api/enquiries/:id', auth, adminOnly, async (req, res) => {
   try {
-    const [total, bookNow, form] = await Promise.all([
-      Enquiry.countDocuments(),
-      Enquiry.countDocuments({ source: 'book_now' }),
-      Enquiry.countDocuments({ source: 'form' })
-    ]);
+    const id = Number(req.params.id);
+    const result = await db.execute({
+      sql: 'DELETE FROM enquiries WHERE id = ?',
+      args: [id]
+    });
+    if (Number(result.rowsAffected) === 0)
+      return res.status(404).json({ error: 'Enquiry not found.' });
+    res.json({ message: 'Deleted.' });
+  } catch {
+    res.status(500).json({ error: 'Server error.' });
+  }
+});
 
-    const byStatusRaw = await Enquiry.aggregate([
-      { $group: { _id: '$property_status', count: { $sum: 1 } } }
-    ]);
-    const byWorkflowRaw = await Enquiry.aggregate([
-      { $group: { _id: '$status', count: { $sum: 1 } } }
-    ]);
-
-    const byStatus = {
-      new_property: 0, under_construction: 0, resale: 0, pre_released: 0
+app.get('/api/enquiries/export.csv', auth, adminOnly, async (_req, res) => {
+  try {
+    const result = await db.execute('SELECT * FROM enquiries ORDER BY created_at DESC');
+    const rows = result.rows;
+    const headers = ['ID','Received','Name','Phone','Email','Interest','Property Type',
+                     'Location','Area','Unit','Made By','Property Status','Workflow','Message'];
+    const esc = (v) => {
+      const s = v == null ? '' : String(v);
+      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
-    byStatusRaw.forEach(r => { if (r._id in byStatus) byStatus[r._id] = r.count; });
-
-    const byWorkflow = { new: 0, contacted: 0, closed: 0 };
-    byWorkflowRaw.forEach(r => { if (r._id in byWorkflow) byWorkflow[r._id] = r.count; });
-
-    res.json({ total, bookNow, form, byStatus, byWorkflow });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    const lines = [headers.join(',')];
+    for (const r of rows) {
+      lines.push([r.id, r.created_at, r.name, r.phone, r.email, r.interest, r.property_type,
+                  r.location, r.area, r.area_unit, r.made_by, r.property_status,
+                  r.workflow_status, r.message].map(esc).join(','));
+    }
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="rg-enquiries-${new Date().toISOString().slice(0,10)}.csv"`);
+    res.send(lines.join('\n'));
+  } catch {
+    res.status(500).json({ error: 'Export failed.' });
   }
 });
 
-/* ============================================================
-   ADMIN — update workflow status
-   ============================================================ */
-app.patch('/api/enquiries/:id', requireAdmin, async (req, res) => {
+/* ─────────────── REVIEWS ROUTES ─────────────── */
+
+app.get('/api/reviews', (req, res) => {
+  const reviews = readJson(REVIEWS_FILE, [])
+    .filter(r => r.approved !== false)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  res.json(reviews);
+});
+
+app.post('/api/reviews', (req, res) => {
+  const { name, rating, message } = req.body || {};
+
+  if (!name || typeof name !== 'string' || !name.trim())
+    return res.status(400).json({ error: 'Your name is required.' });
+  if (!message || typeof message !== 'string' || message.trim().length < 8)
+    return res.status(400).json({ error: 'Please write a longer review (at least 8 characters).' });
+
+  const numRating = Number(rating);
+  if (!Number.isFinite(numRating) || numRating < 1 || numRating > 5)
+    return res.status(400).json({ error: 'Rating must be between 1 and 5.' });
+
+  const review = {
+    id:        Date.now(),
+    name:      name.trim().slice(0, 80),
+    rating:    Math.round(numRating),
+    message:   message.trim().slice(0, 800),
+    createdAt: new Date().toISOString(),
+    approved:  true
+  };
+
+  const all = readJson(REVIEWS_FILE, []);
+  all.push(review);
+  writeJson(REVIEWS_FILE, all);
+
+  console.log('⭐ New review:', review.name, '—', review.rating, '★');
+  res.status(201).json(review);
+});
+
+/* ─────────────── ADMIN PAGE + SPA FALLBACK ─────────────── */
+app.get('/admin', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
+
+/* API 404 — MUST come before SPA fallback */
+app.use('/api', (_req, res) => {
+  res.status(404).json({ error: 'API route not found.' });
+});
+
+/* SPA fallback — only for non-API routes */
+app.use((req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+/* ─────────────── START ─────────────── */
+async function startServer() {
   try {
-    const { status } = req.body || {};
-    if (!ALLOWED_WORKFLOW.includes(status))
-      return res.status(400).json({ error: 'Invalid workflow status' });
-
-    const updated = await Enquiry.findByIdAndUpdate(
-      req.params.id,
-      { status },
-      { new: true }
-    );
-    if (!updated) return res.status(404).json({ error: 'Not found' });
-    res.json({ ok: true, enquiry: updated });
+    await initDb();
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('⚠️  DB init failed, server will still start:', err.message);
   }
-});
-
-/* ============================================================
-   ADMIN — delete
-   ============================================================ */
-app.delete('/api/enquiries/:id', requireAdmin, async (req, res) => {
-  try {
-    const deleted = await Enquiry.findByIdAndDelete(req.params.id);
-    if (!deleted) return res.status(404).json({ error: 'Not found' });
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-/* ---------- SPA fallback ---------- */
-app.get('/',       (_req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-app.get('/admin',  (_req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
-
-/* ---------- Boot ---------- */
-app.listen(PORT, () => {
-  console.log(`🚀 Server running → http://localhost:${PORT}`);
-  console.log(`   Site  : http://localhost:${PORT}/`);
-  console.log(`   Admin : http://localhost:${PORT}/admin`);
-});
+  app.listen(PORT, () => {
+    console.log(`\n🏡 RG Properties backend → http://localhost:${PORT}`);
+    console.log(`   Owner dashboard        → http://localhost:${PORT}/admin`);
+    console.log(`   Database               → Turso (cloud)`);
+    console.log(`   Admin login            → ${process.env.ADMIN_EMAIL || 'admin@rgproperties.com'}\n`);
+  });
+}
+startServer();

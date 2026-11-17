@@ -1,0 +1,525 @@
+
+
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const { createClient } = require('@libsql/client');
+const path = require('path');
+
+const app = express();
+const PORT = process.env.PORT || 4000;
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
+const JWT_EXPIRES = '7d';
+
+/* ─────────────── DATABASE (Turso / libSQL) ─────────────── */
+if (!process.env.TURSO_DATABASE_URL || !process.env.TURSO_AUTH_TOKEN) {
+  console.error('❌ Missing TURSO_DATABASE_URL or TURSO_AUTH_TOKEN in .env');
+  process.exit(1);
+}
+
+const db = createClient({
+  url: process.env.TURSO_DATABASE_URL,
+  authToken: process.env.TURSO_AUTH_TOKEN,
+});
+
+console.log('🌐 Connected to Turso database:', process.env.TURSO_DATABASE_URL.split('?')[0]);
+
+/* ─────────────── SCHEMA + ADMIN SEED ─────────────── */
+async function initDb() {
+  await db.execute(`CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    phone TEXT,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'user',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`);
+
+  await db.execute(`CREATE TABLE IF NOT EXISTS enquiries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    email TEXT NOT NULL,
+    interest TEXT NOT NULL,
+    property_type TEXT NOT NULL,
+    location TEXT NOT NULL,
+    area INTEGER NOT NULL,
+    area_unit TEXT NOT NULL DEFAULT 'sqft',
+    made_by TEXT NOT NULL,
+    property_status TEXT NOT NULL,
+    message TEXT,
+    workflow_status TEXT NOT NULL DEFAULT 'new',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+  )`);
+
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_enq_created ON enquiries(created_at DESC)`);
+  await db.execute(`CREATE INDEX IF NOT EXISTS idx_enq_status  ON enquiries(workflow_status)`);
+
+  // Seed admin if missing
+  const ADMIN_EMAIL    = (process.env.ADMIN_EMAIL    || 'admin@rgproperties.com').toLowerCase();
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD  || 'Admin@12345';
+  const ADMIN_NAME     = process.env.ADMIN_NAME      || 'Owner';
+
+  const found = await db.execute({
+    sql: 'SELECT id FROM users WHERE email = ?',
+    args: [ADMIN_EMAIL]
+  });
+
+  if (found.rows.length === 0) {
+    const hash = bcrypt.hashSync(ADMIN_PASSWORD, 10);
+    await db.execute({
+      sql: 'INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)',
+      args: [ADMIN_NAME, ADMIN_EMAIL, hash, 'admin']
+    });
+    console.log(`✔ Admin created → ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`);
+  } else {
+    console.log(`✔ Admin already exists → ${ADMIN_EMAIL}`);
+  }
+}
+
+/* ─────────────── MIDDLEWARE ─────────────── */
+app.use(cors());
+app.use(express.json({ limit: '1mb' }));
+app.use(express.static(path.join(__dirname, 'public')));
+
+function auth(req, res, next) {
+  const h = req.headers.authorization || '';
+  const token = h.startsWith('Bearer ') ? h.slice(7) : null;
+  if (!token) return res.status(401).json({ error: 'Authentication required.' });
+  try { req.user = jwt.verify(token, JWT_SECRET); next(); }
+  catch { res.status(401).json({ error: 'Invalid or expired token.' }); }
+}
+
+function adminOnly(req, res, next) {
+  if (!req.user || req.user.role !== 'admin')
+    return res.status(403).json({ error: 'Admin access required.' });
+  next();
+}
+
+function optionalAuth(req, res, next) {
+  const h = req.headers.authorization || '';
+  const token = h.startsWith('Bearer ') ? h.slice(7) : null;
+  if (token) { try { req.user = jwt.verify(token, JWT_SECRET); } catch {} }
+  next();
+}
+
+const sign = (u) => jwt.sign(
+  { id: u.id, name: u.name, email: u.email, role: u.role },
+  JWT_SECRET, { expiresIn: JWT_EXPIRES }
+);
+
+/* ─────────────── AUTH ROUTES ─────────────── */
+
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { name, email, phone, password } = req.body || {};
+    if (!name || !email || !password)
+      return res.status(400).json({ error: 'Name, email and password are required.' });
+    if (String(password).length < 6)
+      return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+
+    const cleanEmail = String(email).toLowerCase().trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail))
+      return res.status(400).json({ error: 'Invalid email address.' });
+
+    const existing = await db.execute({
+      sql: 'SELECT id FROM users WHERE email = ?',
+      args: [cleanEmail]
+    });
+    if (existing.rows.length > 0)
+      return res.status(409).json({ error: 'Email already registered. Please log in.' });
+
+    const hash = bcrypt.hashSync(password, 10);
+    const result = await db.execute({
+      sql: 'INSERT INTO users (name, email, phone, password_hash, role) VALUES (?, ?, ?, ?, ?)',
+      args: [String(name).trim(), cleanEmail, phone || null, hash, 'user']
+    });
+
+    const user = {
+      id: Number(result.lastInsertRowid),
+      name: String(name).trim(),
+      email: cleanEmail,
+      role: 'user'
+    };
+    res.status(201).json({ token: sign(user), user });
+  } catch (err) {
+    console.error('Register error:', err);
+    res.status(500).json({ error: 'Server error during registration.' });
+  }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+    if (!email || !password)
+      return res.status(400).json({ error: 'Email and password are required.' });
+
+    const found = await db.execute({
+      sql: 'SELECT * FROM users WHERE email = ?',
+      args: [String(email).toLowerCase().trim()]
+    });
+    const row = found.rows[0];
+
+    if (!row || !bcrypt.compareSync(password, row.password_hash))
+      return res.status(401).json({ error: 'Invalid email or password.' });
+
+    const user = { id: row.id, name: row.name, email: row.email, role: row.role };
+    res.json({ token: sign(user), user });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Server error during login.' });
+  }
+});
+
+app.get('/api/auth/me', auth, async (req, res) => {
+  try {
+    const found = await db.execute({
+      sql: 'SELECT id, name, email, phone, role, created_at FROM users WHERE id = ?',
+      args: [req.user.id]
+    });
+    if (!found.rows[0]) return res.status(404).json({ error: 'User not found.' });
+    res.json({ user: found.rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error.' });
+  }
+});
+
+/* ─────────────── ENQUIRY ROUTES ─────────────── */
+
+app.post('/api/enquiries', optionalAuth, async (req, res) => {
+  try {
+    const b = req.body || {};
+    const required = ['name', 'phone', 'email', 'interest', 'property_type',
+                      'location', 'area', 'made_by', 'property_status'];
+    for (const k of required) {
+      if (b[k] === undefined || b[k] === null || b[k] === '')
+        return res.status(400).json({ error: `Missing field: ${k}` });
+    }
+    if (!['buy', 'sell', 'rent'].includes(b.interest))
+      return res.status(400).json({ error: 'Interest must be buy, sell, or rent.' });
+    if (isNaN(Number(b.area)) || Number(b.area) <= 0)
+      return res.status(400).json({ error: 'Area must be a positive number.' });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(b.email)))
+      return res.status(400).json({ error: 'Invalid email address.' });
+
+    const result = await db.execute({
+      sql: `INSERT INTO enquiries
+        (user_id, name, phone, email, interest, property_type, location,
+         area, area_unit, made_by, property_status, message)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        req.user?.id || null,
+        String(b.name).trim(),
+        String(b.phone).trim(),
+        String(b.email).trim().toLowerCase(),
+        b.interest,
+        String(b.property_type).trim(),
+        String(b.location).trim(),
+        Number(b.area),
+        b.area_unit === 'gaj' ? 'gaj' : 'sqft',
+        b.made_by,
+        b.property_status,
+        b.message ? String(b.message).trim() : null
+      ]
+    });
+
+    res.status(201).json({
+      id: Number(result.lastInsertRowid),
+      message: 'Enquiry submitted successfully.'
+    });
+  } catch (err) {
+    console.error('Enquiry error:', err);
+    res.status(500).json({ error: 'Server error while saving enquiry.' });
+  }
+});
+
+app.get('/api/enquiries', auth, adminOnly, async (req, res) => {
+  try {
+    const page   = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit  = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
+    const offset = (page - 1) * limit;
+
+    const q        = String(req.query.q || '').trim();
+    const status   = req.query.status   || 'all';
+    const interest = req.query.interest || 'all';
+    const sort     = req.query.sort     || 'newest';
+
+    const where = [];
+    const args = [];
+
+    if (q) {
+      where.push('(name LIKE ? OR email LIKE ? OR phone LIKE ? OR location LIKE ? OR property_type LIKE ?)');
+      const like = `%${q}%`;
+      args.push(like, like, like, like, like);
+    }
+    if (['new', 'contacted', 'closed'].includes(status)) { where.push('workflow_status = ?'); args.push(status); }
+    if (['buy', 'sell', 'rent'].includes(interest))       { where.push('interest = ?');       args.push(interest); }
+
+    const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
+    const orderSql = sort === 'oldest' ? 'ORDER BY created_at ASC'
+                   : sort === 'name'   ? 'ORDER BY name ASC'
+                   : 'ORDER BY created_at DESC';
+
+    const countRes = await db.execute({
+      sql: `SELECT COUNT(*) AS c FROM enquiries ${whereSql}`,
+      args
+    });
+    const total = Number(countRes.rows[0].c);
+
+    const listRes = await db.execute({
+      sql: `SELECT * FROM enquiries ${whereSql} ${orderSql} LIMIT ? OFFSET ?`,
+      args: [...args, limit, offset]
+    });
+
+    res.json({
+      enquiries: listRes.rows,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) || 1 }
+    });
+  } catch (err) {
+    console.error('List error:', err);
+    res.status(500).json({ error: 'Server error while loading enquiries.' });
+  }
+});
+
+app.get('/api/enquiries/stats', auth, adminOnly, async (_req, res) => {
+  try {
+    const totalRes = await db.execute('SELECT COUNT(*) AS c FROM enquiries');
+    const total = Number(totalRes.rows[0].c);
+
+    const groupRes = await db.execute(
+      'SELECT workflow_status, COUNT(*) AS c FROM enquiries GROUP BY workflow_status'
+    );
+    const byWorkflow = {};
+    groupRes.rows.forEach(r => { byWorkflow[r.workflow_status] = Number(r.c); });
+
+    const todayRes = await db.execute(
+      "SELECT COUNT(*) AS c FROM enquiries WHERE date(created_at) = date('now')"
+    );
+    const last7Res = await db.execute(
+      "SELECT COUNT(*) AS c FROM enquiries WHERE created_at >= datetime('now','-7 days')"
+    );
+
+    res.json({
+      stats: {
+        total,
+        byWorkflow,
+        today: Number(todayRes.rows[0].c),
+        last7Days: Number(last7Res.rows[0].c)
+      }
+    });
+  } catch (err) {
+    console.error('Stats error:', err);
+    res.status(500).json({ error: 'Server error while loading stats.' });
+  }
+});
+
+app.patch('/api/enquiries/:id', auth, adminOnly, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { workflow_status } = req.body || {};
+    if (!['new', 'contacted', 'closed'].includes(workflow_status))
+      return res.status(400).json({ error: 'Invalid workflow_status.' });
+
+    const result = await db.execute({
+      sql: 'UPDATE enquiries SET workflow_status = ? WHERE id = ?',
+      args: [workflow_status, id]
+    });
+
+    if (Number(result.rowsAffected) === 0)
+      return res.status(404).json({ error: 'Enquiry not found.' });
+    res.json({ message: 'Updated.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error.' });
+  }
+});
+
+app.delete('/api/enquiries/:id', auth, adminOnly, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const result = await db.execute({
+      sql: 'DELETE FROM enquiries WHERE id = ?',
+      args: [id]
+    });
+    if (Number(result.rowsAffected) === 0)
+      return res.status(404).json({ error: 'Enquiry not found.' });
+    res.json({ message: 'Deleted.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error.' });
+  }
+});
+
+app.get('/api/enquiries/export.csv', auth, adminOnly, async (_req, res) => {
+  try {
+    const result = await db.execute('SELECT * FROM enquiries ORDER BY created_at DESC');
+    const rows = result.rows;
+    const headers = ['ID','Received','Name','Phone','Email','Interest','Property Type',
+                     'Location','Area','Unit','Made By','Property Status','Workflow','Message'];
+    const esc = (v) => {
+      const s = v == null ? '' : String(v);
+      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const lines = [headers.join(',')];
+    for (const r of rows) {
+      lines.push([r.id, r.created_at, r.name, r.phone, r.email, r.interest, r.property_type,
+                  r.location, r.area, r.area_unit, r.made_by, r.property_status,
+                  r.workflow_status, r.message].map(esc).join(','));
+    }
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="rg-enquiries-${new Date().toISOString().slice(0,10)}.csv"`);
+    res.send(lines.join('\n'));
+  } catch (err) {
+    res.status(500).json({ error: 'Export failed.' });
+  }
+});
+
+/* ─────────────── ADMIN PAGE ─────────────── */
+app.get('/admin', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
+
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) return next();
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+/* ============================================================
+   RG Properties — Backend Server
+   Endpoints:
+     POST /api/enquiries   (existing — enquiry form)
+     GET  /api/reviews     (NEW — list approved reviews)
+     POST /api/reviews     (NEW — submit a review)
+   ============================================================ */
+
+const express = require('express');
+const fs      = require('fs');
+const path    = require('path');
+
+const app  = express();
+const PORT = process.env.PORT || 3000;
+
+/* ---------- Middleware ---------- */
+app.use(express.json({ limit: '1mb' }));
+app.use(express.static(path.join(__dirname, 'public'))); // serves your index.html
+
+/* Simple CORS (remove if same origin) */
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    if (req.method === 'OPTIONS') return res.sendStatus(200);
+    next();
+});
+
+/* ---------- JSON file helpers ---------- */
+const REVIEWS_FILE   = path.join(__dirname, 'reviews.json');
+const ENQUIRIES_FILE = path.join(__dirname, 'enquiries.json');
+
+function readJson(file, fallback) {
+    try {
+        return JSON.parse(fs.readFileSync(file, 'utf8'));
+    } catch {
+        return fallback;
+    }
+}
+function writeJson(file, data) {
+    fs.writeFileSync(file, JSON.stringify(data, null, 2));
+}
+
+/* ============================================================
+   ENQUIRIES (existing form target)
+   ============================================================ */
+app.post('/api/enquiries', (req, res) => {
+    const body = req.body || {};
+
+    if (!body.name || !body.phone || !body.email) {
+        return res.status(400).json({ error: 'Name, phone and email are required.' });
+    }
+
+    const enquiries = readJson(ENQUIRIES_FILE, []);
+    const record = {
+        id: Date.now(),
+        ...body,
+        createdAt: new Date().toISOString()
+    };
+    enquiries.push(record);
+    writeJson(ENQUIRIES_FILE, enquiries);
+
+    console.log('📝 New enquiry:', record.name, '—', record.phone);
+    res.status(201).json({ ok: true, id: record.id });
+});
+
+/* ============================================================
+   REVIEWS — LIST
+   ============================================================ */
+app.get('/api/reviews', (req, res) => {
+    const reviews = readJson(REVIEWS_FILE, [])
+        .filter(r => r.approved !== false)                   // hide unapproved
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); // newest first
+
+    res.json(reviews);
+});
+
+/* ============================================================
+   REVIEWS — CREATE
+   ============================================================ */
+app.post('/api/reviews', (req, res) => {
+    const { name, rating, message } = req.body || {};
+
+    /* ----- Validation ----- */
+    if (!name || typeof name !== 'string' || !name.trim()) {
+        return res.status(400).json({ error: 'Your name is required.' });
+    }
+    if (!message || typeof message !== 'string' || message.trim().length < 8) {
+        return res.status(400).json({ error: 'Please write a longer review (at least 8 characters).' });
+    }
+    const numRating = Number(rating);
+    if (!Number.isFinite(numRating) || numRating < 1 || numRating > 5) {
+        return res.status(400).json({ error: 'Rating must be between 1 and 5.' });
+    }
+
+    /* ----- Build & save ----- */
+    const review = {
+        id:        Date.now(),
+        name:      name.trim().slice(0, 80),
+        rating:    Math.round(numRating),
+        message:   message.trim().slice(0, 800),
+        createdAt: new Date().toISOString(),
+        approved:  true        // set to `false` if you want to moderate first
+    };
+
+    const all = readJson(REVIEWS_FILE, []);
+    all.push(review);
+    writeJson(REVIEWS_FILE, all);
+
+    console.log('⭐ New review:', review.name, '—', review.rating, '★');
+    res.status(201).json(review);
+});
+
+/* ---------- 404 for unknown API routes ---------- */
+app.use('/api', (req, res) => {
+    res.status(404).json({ error: 'API route not found.' });
+});
+
+/* ---------- Start ---------- */
+app.listen(PORT, () => {
+    console.log(`✅ RG Properties backend running on http://localhost:${PORT}`);
+    console.log(`   Reviews file:   ${REVIEWS_FILE}`);
+    console.log(`   Enquiries file: ${ENQUIRIES_FILE}`);
+});
+/* ─────────────── START ─────────────── */
+async function startServer() {
+  try {
+    await initDb();
+  } catch (err) {
+    console.error('⚠️  DB init failed, server will still start:', err.message);
+  }
+  app.listen(PORT, () => {
+    console.log(`\n🏡 RG Properties backend → http://localhost:${PORT}`);
+    console.log(`   Owner dashboard        → http://localhost:${PORT}/admin`);
+    console.log(`   Database               → Turso (cloud)`);
+    console.log(`   Admin login            → ${process.env.ADMIN_EMAIL || 'admin@rgproperties.com'}\n`);
+  });
+}
+startServer();
