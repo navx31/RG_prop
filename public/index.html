@@ -1685,6 +1685,9 @@
 </head>
 <body>
 
+    <!-- ===== HIDDEN IFRAME TARGET FOR FORMSREACH ===== -->
+    <iframe name="formsreach_target" id="formsreachTarget" style="display:none;" title="Enquiry Submission"></iframe>
+
     <!-- ===== HEADER ===== -->
     <header id="header">
         <div class="container header-inner">
@@ -1861,21 +1864,25 @@
             <div class="enquiry-form-card" data-aos="fade-left">
                 <h3>Submit Your Enquiry</h3>
                 <p class="sub">We'll match you with the perfect property.</p>
-                <form id="enquiryForm" novalidate>
+                <form id="enquiryForm" action="https://app.formsreach.com/forms" method="POST" target="formsreach_target">
+                    <input type="hidden" name="api_key" value="fr_ba4e57917c82892fc9dd495ed11a8ed90a1592a193f6c0ea">
+                    <input type="hidden" name="_subject" value="New RG Properties Enquiry">
+                    <input type="hidden" name="_replyto" id="enqReplyTo" value="">
+
                     <div class="form-row">
                         <div class="form-group">
                             <label for="enqName">Full Name <span class="required">*</span></label>
-                            <input type="text" id="enqName" placeholder="Your full name" required />
+                            <input type="text" id="enqName" name="name" placeholder="Your full name" required />
                         </div>
                         <div class="form-group">
                             <label for="enqPhone">Phone Number <span class="required">*</span></label>
-                            <input type="tel" id="enqPhone" placeholder="+91 98140 70848" required />
+                            <input type="tel" id="enqPhone" name="phone" placeholder="+91 98140 70848" required />
                         </div>
                     </div>
 
                     <div class="form-group">
                         <label for="enqEmail">Email Address <span class="required">*</span></label>
-                        <input type="email" id="enqEmail" placeholder="you@example.com" required />
+                        <input type="email" id="enqEmail" name="email" placeholder="you@example.com" required />
                     </div>
 
                     <div class="form-group">
@@ -1899,7 +1906,7 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label for="enqPropertyType">Property Type <span class="required">*</span></label>
-                            <select id="enqPropertyType" required>
+                            <select id="enqPropertyType" name="property_type" required>
                                 <option value="">Select type</option>
                                 <option value="plots">Plots</option>
                                 <option value="villa">Villa</option>
@@ -1910,15 +1917,15 @@
                         </div>
                         <div class="form-group">
                             <label for="enqLocation">Preferred Location <span class="required">*</span></label>
-                            <input type="text" id="enqLocation" placeholder="City, area, or landmark" required />
+                            <input type="text" id="enqLocation" name="location" placeholder="City, area, or landmark" required />
                         </div>
                     </div>
 
                     <div class="form-group">
                         <label>Area Requirement <span class="required">*</span></label>
                         <div class="inline-group">
-                            <input type="number" id="enqArea" placeholder="e.g. 1200" min="1" required />
-                            <select id="enqAreaUnit">
+                            <input type="number" id="enqArea" name="area" placeholder="e.g. 1200" min="1" required />
+                            <select id="enqAreaUnit" name="area_unit">
                                 <option value="sqft">Square Feet</option>
                                 <option value="gaj">Gaj</option>
                             </select>
@@ -1928,7 +1935,7 @@
 
                     <div class="form-group">
                         <label for="enqMadeBy">Property Made By <span class="required">*</span></label>
-                        <select id="enqMadeBy" required>
+                        <select id="enqMadeBy" name="made_by" required>
                             <option value="">Select</option>
                             <option value="builder">Builder Made</option>
                             <option value="owner">Owner Made</option>
@@ -1941,19 +1948,19 @@
                         <label>Property Status <span class="required">*</span></label>
                         <div class="radio-group status-group" id="statusGroup">
                             <label>
-                                <input type="radio" name="propertyStatus" value="new_property" checked />
+                                <input type="radio" name="property_status" value="new_property" checked />
                                 <span class="radio-label"><i class="fas fa-certificate"></i> New Property</span>
                             </label>
                             <label>
-                                <input type="radio" name="propertyStatus" value="under_construction" />
+                                <input type="radio" name="property_status" value="under_construction" />
                                 <span class="radio-label"><i class="fas fa-helmet-safety"></i> Under Construction</span>
                             </label>
                             <label>
-                                <input type="radio" name="propertyStatus" value="resale" />
+                                <input type="radio" name="property_status" value="resale" />
                                 <span class="radio-label"><i class="fas fa-rotate"></i> Resale</span>
                             </label>
                             <label>
-                                <input type="radio" name="propertyStatus" value="pre_released" />
+                                <input type="radio" name="property_status" value="pre_released" />
                                 <span class="radio-label"><i class="fas fa-bolt"></i> Pre-Released Project</span>
                             </label>
                         </div>
@@ -1962,7 +1969,7 @@
 
                     <div class="form-group">
                         <label for="enqMessage">Additional Message</label>
-                        <textarea id="enqMessage" placeholder="Any specific requirements or preferences..."></textarea>
+                        <textarea id="enqMessage" name="message" placeholder="Any specific requirements or preferences..."></textarea>
                     </div>
 
                     <!-- ===== BOOK NOW TRACKING (HIDDEN FIELDS) ===== -->
@@ -2105,7 +2112,7 @@
                 <div class="footer-col" data-aos="fade-up" data-aos-delay="300">
                     <h4>Connect</h4>
                     <a href="#"><i class="fab fa-facebook"></i> Facebook</a>
-                    <a href="#"><i class="fab fa-instagram"></i> Instagram</a>
+                    <a href="https://www.instagram.com/rg._.property/" target="_blank" rel="noopener"><i class="fab fa-instagram"></i> Instagram</a>
                     <a href="#"><i class="fab fa-twitter"></i> Twitter</a>
                     <a href="#"><i class="fab fa-linkedin"></i> LinkedIn</a>
                 </div>
@@ -2231,24 +2238,6 @@
         logoUrl:   '',               
         website:   location.origin
     };
-
-    /* ============ API + AUTH ============ */
-    const API_BASE = '/api';
-    const Auth = {
-        get token(){ return localStorage.getItem('rg_token'); },
-        get user(){ try { return JSON.parse(localStorage.getItem('rg_user') || 'null'); } catch { return null; } },
-        set(t, u){ localStorage.setItem('rg_token', t); localStorage.setItem('rg_user', JSON.stringify(u)); },
-        clear(){ localStorage.removeItem('rg_token'); localStorage.removeItem('rg_user'); }
-    };
-
-    async function api(path, opts = {}) {
-        const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
-        if (Auth.token) headers.Authorization = 'Bearer ' + Auth.token;
-        const res = await fetch(API_BASE + path, { ...opts, headers });
-        let data = null;
-        try { data = await res.json(); } catch { data = {}; }
-        return { ok: res.ok, status: res.status, data };
-    }
 
     /* ============================================================
        AOS INIT (with fallback if the CDN didn't load)
@@ -2894,122 +2883,78 @@
     }
 
     /* ============================================================
-       SAVE ENQUIRY LOCALLY (fallback when there is no backend)
+       ENQUIRY FORM → FORMSREACH (native submit via hidden iframe)
        ============================================================ */
-    function saveEnquiryLocally(payload) {
-        try {
-            const queue = JSON.parse(localStorage.getItem('rg_enquiries') || '[]');
-            queue.push({ ...payload, savedAt: new Date().toISOString() });
-            localStorage.setItem('rg_enquiries', JSON.stringify(queue));
-        } catch (e) {
-            console.warn('Could not store enquiry locally', e);
-        }
+    const formsreachIframe = document.getElementById('formsreachTarget');
+    let initialIframeLoadDone = false;
+    let awaitingEnquiryResponse = false;
+
+    // Sync email → _replyto field so replies go straight to the customer
+    const enqEmailInput = document.getElementById('enqEmail');
+    const enqReplyToField = document.getElementById('enqReplyTo');
+    if (enqEmailInput && enqReplyToField) {
+        enqEmailInput.addEventListener('input', () => {
+            enqReplyToField.value = enqEmailInput.value.trim();
+        });
     }
 
-    /* ============================================================
-       ENQUIRY FORM → BACKEND (with graceful offline fallback)
-       ============================================================ */
-    enquiryForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
-
-        const name            = document.getElementById('enqName').value.trim();
-        const phone           = document.getElementById('enqPhone').value.trim();
-        const email           = document.getElementById('enqEmail').value.trim();
-        const interestEl      = document.querySelector('input[name="interest"]:checked');
-        const property_type   = document.getElementById('enqPropertyType').value;
-        const location        = document.getElementById('enqLocation').value.trim();
-        const area            = document.getElementById('enqArea').value.trim();
-        const area_unit       = document.getElementById('enqAreaUnit').value;
-        const made_by         = document.getElementById('enqMadeBy').value;
-        const statusEl        = document.querySelector('input[name="propertyStatus"]:checked');
-        const property_status = statusEl ? statusEl.value : '';
-        const message         = document.getElementById('enqMessage').value.trim();
-
-        const source              = document.getElementById('enqSource').value || 'form';
-        const property_id         = document.getElementById('enqPropertyId').value || null;
-        const property_title      = document.getElementById('enqPropertyTitle').value;
-        const property_location   = document.getElementById('enqPropertyLocation').value;
-        const property_price      = document.getElementById('enqPropertyPrice').value;
-        const property_category   = document.getElementById('enqPropertyCategory').value;
-        const property_type_label = document.getElementById('enqPropertyTypeLabel').value;
-        const property_badge      = document.getElementById('enqPropertyBadge').value;
-
-        if (!name)  return showToast('Please enter your full name.', true);
-        if (!phone) return showToast('Please enter your phone number.', true);
-        if (!email || !email.includes('@')) return showToast('Please enter a valid email.', true);
-        if (!interestEl) return showToast('Please select your interest.', true);
-        if (!property_type) return showToast('Please select a property type.', true);
-        if (!location) return showToast('Please enter your preferred location.', true);
-        if (!area || Number(area) <= 0) return showToast('Please enter a valid area.', true);
-        if (!made_by) return showToast('Please select who made the property.', true);
-        if (!property_status) return showToast('Please select the property status.', true);
-
-        const payload = {
-            name, phone, email,
-            interest: interestEl.value,
-            property_type,
-            location,
-            area: Number(area),
-            area_unit,
-            made_by,
-            property_status,
-            message,
-            source,
-            property_id: property_id ? Number(property_id) : null,
-            property_title,
-            property_location,
-            property_price: property_price ? Number(property_price) : null,
-            property_category,
-            property_type_label,
-            property_badge
-        };
-
-        const submitBtn = enquiryForm.querySelector('button[type="submit"]');
-        const original  = submitBtn.innerHTML;
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending…';
-
-        let failed = false;
-
-        try {
-            const { ok, status, data } = await api('/enquiries', {
-                method: 'POST',
-                body: JSON.stringify(payload)
-            });
-
-            if (!ok && (status === 404 || status === 405)) {
-                saveEnquiryLocally(payload);
-            } else if (!ok) {
-                throw new Error((data && data.error) || 'Submission failed.');
+    // When the form is submitted → show "Sending…" and mark awaiting response
+    if (enquiryForm) {
+        enquiryForm.addEventListener('submit', function() {
+            if (awaitingEnquiryResponse) {
+                // Prevent accidental double-submit while one is in flight
+                return;
             }
-        } catch (err) {
-            if (err instanceof TypeError) {
-                console.warn('Backend unavailable — enquiry saved locally.', err);
-                saveEnquiryLocally(payload);
-            } else {
-                console.error('❌ Enquiry error:', err);
-                showToast(err.message, true);
-                failed = true;
+            awaitingEnquiryResponse = true;
+
+            const submitBtn = enquiryForm.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                // Use setTimeout so we don't disable the button before native submit fires
+                setTimeout(() => {
+                    submitBtn.dataset.originalHtml = submitBtn.innerHTML;
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending…';
+                    // Keep it enabled so the native submit is not cancelled
+                }, 0);
             }
-        }
+        });
+    }
 
-        submitBtn.disabled  = false;
-        submitBtn.innerHTML = original;
+    // When the hidden iframe finishes loading → FormsReach responded
+    if (formsreachIframe) {
+        formsreachIframe.addEventListener('load', function() {
+            if (!initialIframeLoadDone) {
+                // First load is the empty about:blank iframe
+                initialIframeLoadDone = true;
+                return;
+            }
 
-        if (failed) return;
+            if (!awaitingEnquiryResponse) return;
+            awaitingEnquiryResponse = false;
 
-        showToast(`Thanks ${name}! Your enquiry has been received.`);
-        enquiryForm.reset();
+            const submitBtn = enquiryForm.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.innerHTML = submitBtn.dataset.originalHtml
+                    || '<i class="fas fa-paper-plane"></i> Send Enquiry';
+            }
 
-        document.getElementById('enqSource').value            = 'form';
-        document.getElementById('enqPropertyId').value        = '';
-        document.getElementById('enqPropertyTitle').value     = '';
-        document.getElementById('enqPropertyLocation').value  = '';
-        document.getElementById('enqPropertyPrice').value     = '';
-        document.getElementById('enqPropertyCategory').value  = '';
-        document.getElementById('enqPropertyTypeLabel').value = '';
-        document.getElementById('enqPropertyBadge').value     = '';
-    });
+            // Success — show toast and reset
+            const name = (document.getElementById('enqName').value || '').trim();
+            showToast(name ? `Thanks ${name}! Your enquiry has been sent.` : 'Thanks! Your enquiry has been sent.');
+
+            enquiryForm.reset();
+
+            // Reset hidden book-now tracking fields
+            document.getElementById('enqSource').value            = 'form';
+            document.getElementById('enqPropertyId').value        = '';
+            document.getElementById('enqPropertyTitle').value     = '';
+            document.getElementById('enqPropertyLocation').value  = '';
+            document.getElementById('enqPropertyPrice').value     = '';
+            document.getElementById('enqPropertyCategory').value  = '';
+            document.getElementById('enqPropertyTypeLabel').value = '';
+            document.getElementById('enqPropertyBadge').value     = '';
+            if (enqReplyToField) enqReplyToField.value = '';
+        });
+    }
 
     /* ============================================================
        CHART.JS — COMBINED CHART
@@ -3140,6 +3085,194 @@
     });
 
     /* ============================================================
+       REVIEWS — LOCALSTORAGE + RENDER + MODAL + SUBMIT
+       ============================================================ */
+    const REVIEWS_KEY = 'rg_reviews';
+
+    const DEFAULT_REVIEWS = [
+        {
+            name: 'Navjot Singh',
+            rating: 5,
+            text: 'RG Properties helped me find my dream kothi in Sector 125. The team was professional, transparent, and guided me through every step. Highly recommended!',
+            date: '2025-11-12'
+        },
+        {
+            name: 'Simran Kaur',
+            rating: 5,
+            text: 'Bought a plot through RG Properties. Great selection, fair pricing, and zero hidden charges. The WhatsApp updates made everything easy.',
+            date: '2025-10-03'
+        },
+        {
+            name: 'Harpreet Gill',
+            rating: 4,
+            text: 'Good experience overall. The team responded quickly and showed me multiple options in my budget. Will use them again for renting.',
+            date: '2025-09-18'
+        }
+    ];
+
+    function getReviews() {
+        try {
+            const stored = JSON.parse(localStorage.getItem(REVIEWS_KEY));
+            if (Array.isArray(stored) && stored.length) return stored;
+        } catch (e) { /* ignore */ }
+        return DEFAULT_REVIEWS.slice();
+    }
+
+    function saveReviews(list) {
+        try {
+            localStorage.setItem(REVIEWS_KEY, JSON.stringify(list));
+        } catch (e) { console.warn('Could not save reviews', e); }
+    }
+
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    function renderStars(rating) {
+        let html = '';
+        for (let i = 1; i <= 5; i++) {
+            html += `<i class="fas fa-star ${i <= rating ? '' : 'empty'}"></i>`;
+        }
+        return html;
+    }
+
+    function renderReviews() {
+        const gridEl = document.getElementById('reviewsGrid');
+        if (!gridEl) return;
+
+        const reviews = getReviews();
+        if (!reviews.length) {
+            gridEl.innerHTML = `
+                <div class="reviews-empty">
+                    <i class="fas fa-star"></i>
+                    <h3>No reviews yet</h3>
+                    <p>Be the first to share your experience!</p>
+                </div>`;
+            return;
+        }
+
+        const sorted = reviews.slice().sort((a, b) =>
+            new Date(b.date || 0) - new Date(a.date || 0)
+        );
+
+        gridEl.innerHTML = sorted.map(r => {
+            const initial = (r.name || '?').trim().charAt(0).toUpperCase() || '?';
+            const stars = renderStars(r.rating || 5);
+            return `
+                <div class="review-card" data-aos="fade-up">
+                    <i class="fas fa-quote-right quote-icon"></i>
+                    <div class="stars">${stars}</div>
+                    <p class="review-text">${escapeHtml(r.text || '')}</p>
+                    <div class="review-author">
+                        <div class="avatar">${escapeHtml(initial)}</div>
+                        <div class="author-info">
+                            <strong>${escapeHtml(r.name || 'Anonymous')}</strong>
+                            <span>${r.date ? new Date(r.date).toLocaleDateString('en-IN', { year: 'numeric', month: 'short' }) : ''}</span>
+                        </div>
+                    </div>
+                </div>`;
+        }).join('');
+
+        if (window.AOS) AOS.refresh();
+    }
+
+    /* --- Modal open/close --- */
+    const reviewModal = document.getElementById('reviewModal');
+    const openReviewBtn = document.getElementById('openReviewFormBtn');
+    const reviewModalClose = document.getElementById('reviewModalClose');
+
+    function openReviewModal() {
+        if (!reviewModal) return;
+        reviewModal.classList.add('open');
+        reviewModal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('modal-open');
+        const ratingInput = document.getElementById('reviewRating');
+        if (ratingInput) ratingInput.value = '5';
+        setStarInput(5);
+    }
+
+    function closeReviewModal() {
+        if (!reviewModal) return;
+        reviewModal.classList.remove('open');
+        reviewModal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('modal-open');
+    }
+
+    if (openReviewBtn) openReviewBtn.addEventListener('click', openReviewModal);
+    if (reviewModalClose) reviewModalClose.addEventListener('click', closeReviewModal);
+    const reviewBackdrop = reviewModal ? reviewModal.querySelector('[data-close-review-modal]') : null;
+    if (reviewBackdrop) reviewBackdrop.addEventListener('click', closeReviewModal);
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && reviewModal && reviewModal.classList.contains('open')) {
+            closeReviewModal();
+        }
+    });
+
+    /* --- Star input --- */
+    function setStarInput(value) {
+        const starWrap = document.getElementById('starInput');
+        if (!starWrap) return;
+        starWrap.querySelectorAll('i').forEach(star => {
+            star.classList.toggle('active', parseInt(star.dataset.value, 10) <= value);
+        });
+    }
+
+    const starInputWrap = document.getElementById('starInput');
+    if (starInputWrap) {
+        const stars = starInputWrap.querySelectorAll('i');
+        stars.forEach(star => {
+            star.addEventListener('mouseenter', () => setStarInput(parseInt(star.dataset.value, 10)));
+            star.addEventListener('click', () => {
+                const val = parseInt(star.dataset.value, 10);
+                const hidden = document.getElementById('reviewRating');
+                if (hidden) hidden.value = val;
+                setStarInput(val);
+            });
+        });
+        starInputWrap.addEventListener('mouseleave', () => {
+            const hidden = document.getElementById('reviewRating');
+            setStarInput(hidden ? parseInt(hidden.value, 10) : 5);
+        });
+    }
+
+    /* --- Submit review --- */
+    const reviewFormEl = document.getElementById('reviewForm');
+    if (reviewFormEl) {
+        reviewFormEl.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const name = document.getElementById('reviewName').value.trim();
+            const rating = parseInt(document.getElementById('reviewRating').value, 10) || 5;
+            const text = document.getElementById('reviewMessage').value.trim();
+
+            if (!name) return showToast('Please enter your name.', true);
+            if (!text) return showToast('Please write your review.', true);
+
+            const review = {
+                name,
+                rating: Math.min(5, Math.max(1, rating)),
+                text,
+                date: new Date().toISOString().slice(0, 10)
+            };
+
+            const list = getReviews();
+            list.push(review);
+            saveReviews(list);
+
+            renderReviews();
+            reviewFormEl.reset();
+            setStarInput(5);
+            const hidden = document.getElementById('reviewRating');
+            if (hidden) hidden.value = '5';
+            closeReviewModal();
+            showToast('Thanks! Your review has been posted.');
+        });
+    }
+
+    /* ============================================================
        INITIALIZE EVERYTHING
        ============================================================ */
     window.addEventListener('DOMContentLoaded', function() {
@@ -3147,8 +3280,10 @@
         renderProperties();
         initCombinedChart();
         animateNumbers();
+        renderReviews();
     });
 
     </script>
+    <!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "9cb14c22435d454b8103e2b0f673641e"}'></script><!-- End Cloudflare Web Analytics -->
 </body>
 </html>
